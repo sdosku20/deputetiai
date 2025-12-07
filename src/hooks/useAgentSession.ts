@@ -97,10 +97,11 @@ export function useAgentSession(sessionId: string | null = null) {
           return response;
         } else {
           // Backend responded but indicated failure
-          console.error("[useAgentSession] Backend indicated failure:", {
-            response,
+          const errorDetails = response?.error ? String(response.error) : 'Unknown error';
+          console.error("[useAgentSession] ❌ Backend indicated failure:", {
             success: response?.success,
-            error: response?.error
+            hasResponse: !!response?.response,
+            error: errorDetails
           });
           
           const errorContent = response?.error || 

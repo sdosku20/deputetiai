@@ -63,12 +63,19 @@ class APIClient {
         const url = error.config?.url;
         
         console.error(`[API Client] ❌ ${status} ${method} ${url}`);
+        
+        // Better error logging - extract data properly
+        const responseData = error.response?.data;
+        const responseDataStr = responseData 
+          ? (typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2))
+          : 'No response data';
+        
         console.error('[API Client] Error details:', {
           status: error.response?.status,
           statusText: error.response?.statusText,
-          data: error.response?.data,
-          headers: error.config?.headers,
-          requestData: error.config?.data,
+          responseData: responseDataStr,
+          requestHeaders: JSON.stringify(error.config?.headers || {}, null, 2),
+          requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
         });
         
         // Handle 401 - invalid API key
@@ -194,22 +201,30 @@ class ChatAPIClient {
 
       // Build request matching OpenAI-compatible format exactly
       // Match the curl example format: {"model": "eu-law-rag", "messages": [...]}
-      // Ensure messages array only contains objects with role and content (strings)
-      const requestBody = {
-        model: this.model,
-        messages: messages.map(msg => ({
-          role: String(msg.role),
-          content: String(msg.content)
-        }))
+      // IMPORTANT: Ensure messages array only contains objects with role and content (strings)
+      // Create minimal, clean objects to match curl exactly
+      const cleanMessages: Array<{ role: string; content: string }> = [];
+      for (const msg of messages) {
+        cleanMessages.push({
+          role: String(msg.role).trim(),
+          content: String(msg.content).trim()
+        });
+      }
+
+      // Build request body exactly like curl: {"model": "eu-law-rag", "messages": [...]}
+      const requestBody: { model: string; messages: Array<{ role: string; content: string }> } = {
+        model: String(this.model).trim(),
+        messages: cleanMessages
       };
 
-      // Log what we're actually sending
-      console.log('[ChatAPI] Sending request:', {
+      // Log what we're actually sending (before axios serialization)
+      const requestBodyJson = JSON.stringify(requestBody);
+      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
+      console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
+      console.log('[ChatAPI] Request details:', {
         model: this.model,
         messageCount: messages.length,
         sessionId,
-        url: `${API_BASE_URL}/v1/chat/completions`,
-        requestBody: JSON.stringify(requestBody, null, 2),
         messagesPreview: messages.map(m => ({ 
           role: m.role, 
           contentLength: m.content.length,
@@ -218,6 +233,7 @@ class ChatAPIClient {
       });
 
       // Send request - axios will automatically serialize to JSON
+      // Make sure we're sending exactly the format curl sends
       const response = await this.apiClient.post<ChatCompletionResponse>(
         '/v1/chat/completions',
         requestBody
@@ -258,17 +274,24 @@ class ChatAPIClient {
       const errorStatus = error.response?.status;
       const errorStatusText = error.response?.statusText;
       
+      // Extract error message properly
+      const errorDataStr = errorData 
+        ? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2))
+        : 'No error data';
+      
+      const requestDataStr = error.config?.data 
+        ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2))
+        : 'No request data';
+      
       console.error('[ChatAPI] Error sending message:', {
         status: errorStatus,
         statusText: errorStatusText,
         errorMessage: error.message,
         errorCode: error.code,
-        errorData: errorData,
-        errorDataType: typeof errorData,
-        errorDataString: typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2),
+        errorResponseData: errorDataStr,
         requestUrl: error.config?.url,
         requestMethod: error.config?.method,
-        requestData: error.config?.data,
+        requestData: requestDataStr,
       });
       
       // Try to extract a meaningful error message from various error formats
@@ -295,9 +318,14 @@ class ChatAPIClient {
       
       // If we got a 500 error with RAG pipeline error, show it clearly
       if (errorStatus === 500 && errorMessage.includes('RAG')) {
-        console.error('[ChatAPI] RAG Pipeline Error detected!');
-        console.error('[ChatAPI] Full error response:', errorData);
-        console.error('[ChatAPI] Error as string:', typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
+        console.error('[ChatAPI] ⚠️ RAG Pipeline Error detected!');
+        console.error('[ChatAPI] This suggests the backend received data in an unexpected format.');
+        console.error('[ChatAPI] Error response:', errorDataStr);
+        console.error('[ChatAPI] What we sent:', requestDataStr);
+        console.error('[ChatAPI] Expected format (from curl):', JSON.stringify({
+          model: "eu-law-rag",
+          messages: [{ role: "user", content: "What is Article 50 TEU?" }]
+        }, null, 2));
       }
       
       return {
