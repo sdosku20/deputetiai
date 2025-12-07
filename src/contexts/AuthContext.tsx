@@ -39,16 +39,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const apiKey = localStorage.getItem('api_key');
     const userEmail = localStorage.getItem('user_email');
     
-    if (apiKey) {
+    // AUTO-LOGIN: Set default API key if not present
+    // TODO: Remove this and restore login requirement when needed
+    if (!apiKey) {
+      const defaultApiKey = 'sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4';
+      localStorage.setItem('api_key', defaultApiKey);
+      localStorage.setItem('user_email', 'user@deputeti.ai');
+      setUser({
+        id: 'user',
+        email: 'user@deputeti.ai',
+      });
+      setLoading(false);
+    } else {
       setUser({
         id: 'user',
         email: userEmail || 'user@deputeti.ai',
       });
       setLoading(false);
-    } else {
-      setUser(null);
-      setLoading(false);
     }
+    
+    // COMMENTED OUT: Original login requirement
+    // if (apiKey) {
+    //   setUser({
+    //     id: 'user',
+    //     email: userEmail || 'user@deputeti.ai',
+    //   });
+    //   setLoading(false);
+    // } else {
+    //   setUser(null);
+    //   setLoading(false);
+    // }
   }, []);
 
   // Initialize auth state on mount

@@ -53,12 +53,13 @@ function ChatPageContent() {
     useAgentSession(sessionId);
   const { sessions, deleteSession, refreshSessions } = useConversationSessions();
 
+  // COMMENTED OUT: Login requirement removed
   // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, router]);
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     router.push("/login");
+  //   }
+  // }, [isAuthenticated, router]);
 
   // Refresh sessions when component mounts or when route changes
   useEffect(() => {

@@ -1,3 +1,13 @@
+/* 
+ * LOGIN PAGE - COMMENTED OUT
+ * 
+ * This login page is currently disabled. Users are auto-authenticated.
+ * To restore login requirement:
+ * 1. Uncomment this file
+ * 2. Remove auto-login logic in AuthContext.tsx
+ * 3. Restore auth checks in page.tsx and chat/page.tsx
+ */
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -5,7 +15,25 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
+// COMMENTED OUT: Login page disabled - redirecting to chat
 export default function LoginPage() {
+  const router = useRouter();
+  
+  // Auto-redirect to chat (login not required)
+  useEffect(() => {
+    router.push('/chat');
+  }, [router]);
+  
+  // Show loading while redirecting
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>
+  );
+}
+
+/* COMMENTED OUT: Original login page code
+export default function LoginPageOriginal() {
   const [apiKey, setApiKey] = useState("");
   const [email, setEmail] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);

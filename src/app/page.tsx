@@ -10,15 +10,20 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!loading) {
-      if (isAuthenticated) {
-        // User is authenticated, redirect to chat interface
-        router.push('/chat');
-      } else {
-        // User is not authenticated, redirect to login
-        router.push('/login');
-      }
+      // AUTO-LOGIN: Always redirect to chat (login requirement commented out)
+      // TODO: Restore login check when needed
+      router.push('/chat');
+      
+      // COMMENTED OUT: Original authentication check
+      // if (isAuthenticated) {
+      //   // User is authenticated, redirect to chat interface
+      //   router.push('/chat');
+      // } else {
+      //   // User is not authenticated, redirect to login
+      //   router.push('/login');
+      // }
     }
-  }, [isAuthenticated, loading, router]);
+  }, [loading, router]); // Removed isAuthenticated dependency
 
   // Show loading state while checking authentication
   return (
