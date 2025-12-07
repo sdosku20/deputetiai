@@ -26,15 +26,28 @@ class APIClient {
         const apiKey = typeof window !== 'undefined' ? localStorage.getItem('api_key') : null;
 
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${config.url}`);
+        
+        // Log the actual data that will be sent
+        const requestDataForLog = config.data;
+        const requestDataJson = typeof requestDataForLog === 'string' 
+          ? requestDataForLog 
+          : JSON.stringify(requestDataForLog);
+        
         console.log('[API Client] Request config:', {
           baseURL: config.baseURL,
           url: config.url,
           method: config.method,
           headers: config.headers,
-          data: config.data,
           dataType: typeof config.data,
-          dataString: typeof config.data === 'string' ? config.data : JSON.stringify(config.data, null, 2),
+          dataAsJson: requestDataJson,
         });
+        
+        // Compare with curl format
+        if (config.url?.includes('/chat/completions')) {
+          console.log('[API Client] 🔍 Comparing with curl format...');
+          console.log('[API Client] Our request:', requestDataJson);
+          console.log('[API Client] Curl format:', '{"model":"eu-law-rag","messages":[{"role":"user","content":"What is Article 50 TEU?"}]}');
+        }
         
         if (apiKey) {
           config.headers['X-API-Key'] = apiKey;
@@ -221,6 +234,7 @@ class ChatAPIClient {
       const requestBodyJson = JSON.stringify(requestBody);
       console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
+      console.log('[ChatAPI] Request body (parsed back to verify):', JSON.parse(requestBodyJson));
       console.log('[ChatAPI] Request details:', {
         model: this.model,
         messageCount: messages.length,
@@ -232,11 +246,11 @@ class ChatAPIClient {
         }))
       });
 
-      // Send request - axios will automatically serialize to JSON
-      // Make sure we're sending exactly the format curl sends
+      // Send request - send as object, axios will serialize to JSON
+      // The requestBody structure matches curl exactly
       const response = await this.apiClient.post<ChatCompletionResponse>(
         '/v1/chat/completions',
-        requestBody
+        requestBody // Send as object, axios will JSON.stringify it
       );
 
       console.log('[ChatAPI] Response received:', {
