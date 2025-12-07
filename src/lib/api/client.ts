@@ -26,10 +26,19 @@ class APIClient {
         const apiKey = typeof window !== 'undefined' ? localStorage.getItem('api_key') : null;
 
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${config.url}`);
+        console.log('[API Client] Request config:', {
+          baseURL: config.baseURL,
+          url: config.url,
+          method: config.method,
+          headers: config.headers,
+          data: config.data,
+          dataType: typeof config.data,
+          dataString: typeof config.data === 'string' ? config.data : JSON.stringify(config.data, null, 2),
+        });
         
         if (apiKey) {
           config.headers['X-API-Key'] = apiKey;
-          console.log('[API Client] ✓ Added X-API-Key header');
+          console.log('[API Client] ✓ Added X-API-Key header:', apiKey.substring(0, 10) + '...');
         } else {
           console.log('[API Client] ⚠️ No API key found in localStorage');
         }
@@ -244,20 +253,27 @@ class ChatAPIClient {
         response: assistantMessage,
       };
     } catch (error: any) {
+      // Better error logging
+      const errorData = error.response?.data;
+      const errorStatus = error.response?.status;
+      const errorStatusText = error.response?.statusText;
+      
       console.error('[ChatAPI] Error sending message:', {
-        error,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        fullError: JSON.stringify(error.response?.data, null, 2),
+        status: errorStatus,
+        statusText: errorStatusText,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorData: errorData,
+        errorDataType: typeof errorData,
+        errorDataString: typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2),
+        requestUrl: error.config?.url,
+        requestMethod: error.config?.method,
+        requestData: error.config?.data,
       });
       
       // Try to extract a meaningful error message from various error formats
       let errorMessage = 'Failed to send message';
       
-      // Check different possible error response formats
-      const errorData = error.response?.data;
       if (errorData) {
         // Try different error message locations
         if (typeof errorData === 'string') {
@@ -278,8 +294,10 @@ class ChatAPIClient {
       }
       
       // If we got a 500 error with RAG pipeline error, show it clearly
-      if (error.response?.status === 500 && errorMessage.includes('RAG')) {
-        console.error('[ChatAPI] RAG Pipeline Error - This might be a backend issue. Full error:', errorData);
+      if (errorStatus === 500 && errorMessage.includes('RAG')) {
+        console.error('[ChatAPI] RAG Pipeline Error detected!');
+        console.error('[ChatAPI] Full error response:', errorData);
+        console.error('[ChatAPI] Error as string:', typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
       }
       
       return {
