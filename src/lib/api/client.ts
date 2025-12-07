@@ -47,6 +47,14 @@ class APIClient {
           console.log('[API Client] 🔍 Comparing with curl format...');
           console.log('[API Client] Our request:', requestDataJson);
           console.log('[API Client] Curl format:', '{"model":"eu-law-rag","messages":[{"role":"user","content":"What is Article 50 TEU?"}]}');
+          
+          // CRITICAL: Log exactly what axios will send
+          console.log('[API Client] 🔍 Final request details:');
+          console.log('  - URL:', config.baseURL + config.url);
+          console.log('  - Method:', config.method);
+          console.log('  - Headers:', JSON.stringify(config.headers, null, 2));
+          console.log('  - Data type:', typeof config.data);
+          console.log('  - Data value:', config.data);
         }
         
         if (apiKey) {
@@ -122,8 +130,17 @@ class APIClient {
     return response.data;
   }
 
-  async post<T>(url: string, data?: any): Promise<T> {
-    const response = await this.client.post<T>(url, data);
+  async post<T>(url: string, data?: any, config?: any): Promise<T> {
+    // If data is a string (pre-stringified JSON), ensure it's sent correctly
+    const mergedConfig = config ? {
+      ...config,
+      headers: {
+        ...this.client.defaults.headers,
+        ...config.headers,
+      }
+    } : undefined;
+    
+    const response = await this.client.post<T>(url, data, mergedConfig);
     return response.data;
   }
 }
@@ -246,11 +263,11 @@ class ChatAPIClient {
         }))
       });
 
-      // Send request - send as object, axios will serialize to JSON
-      // The requestBody structure matches curl exactly
+      // Send request as object - axios will serialize it properly
+      // The requestBody is a clean object with only model and messages
       const response = await this.apiClient.post<ChatCompletionResponse>(
         '/v1/chat/completions',
-        requestBody // Send as object, axios will JSON.stringify it
+        requestBody // Send as object - axios handles JSON serialization
       );
 
       console.log('[ChatAPI] Response received:', {
