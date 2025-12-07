@@ -1,21 +1,19 @@
-/* 
- * LOGIN PAGE - COMMENTED OUT
+/*
+ * LOGIN PAGE - DISABLED
  * 
  * This login page is currently disabled. Users are auto-authenticated.
  * To restore login requirement:
- * 1. Uncomment this file
+ * 1. Restore the code below
  * 2. Remove auto-login logic in AuthContext.tsx
  * 3. Restore auth checks in page.tsx and chat/page.tsx
  */
 
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// COMMENTED OUT: Login page disabled - redirecting to chat
+// Login page disabled - redirecting to chat
 export default function LoginPage() {
   const router = useRouter();
   
@@ -32,8 +30,19 @@ export default function LoginPage() {
   );
 }
 
-/* COMMENTED OUT: Original login page code
-export default function LoginPageOriginal() {
+/*
+ * COMMENTED OUT - Original login page code
+ * 
+ * Uncomment below to restore login functionality:
+ * 
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
   const [apiKey, setApiKey] = useState("");
   const [email, setEmail] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -42,7 +51,6 @@ export default function LoginPageOriginal() {
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Redirect authenticated users away from login page
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       router.push("/chat");
@@ -56,7 +64,6 @@ export default function LoginPageOriginal() {
     } else if (name === "email") {
       setEmail(value);
     }
-    // Clear error when user starts typing
     if (error) setError("");
   };
 
@@ -74,7 +81,6 @@ export default function LoginPageOriginal() {
       const result = await login(apiKey, email || undefined);
 
       if (result.success) {
-        // Redirect to chat interface
         router.push("/chat");
       } else {
         setError(result.error || "Login failed. Please check your API key.");
@@ -93,13 +99,11 @@ export default function LoginPageOriginal() {
       style={{ backgroundColor: "#F5F4F1" }}
     >
       <div className="w-[400px] space-y-8">
-        {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-black">Deputeti AI</h2>
           <p className="mt-2 text-sm text-body">Login with your API key</p>
         </div>
 
-        {/* Login Form */}
         <div className="bg-white rounded-lg p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
@@ -108,7 +112,6 @@ export default function LoginPageOriginal() {
               </div>
             )}
 
-            {/* Email Field (Optional) */}
             <div>
               <label
                 htmlFor="email"
@@ -127,7 +130,6 @@ export default function LoginPageOriginal() {
               />
             </div>
 
-            {/* API Key Field */}
             <div>
               <label
                 htmlFor="apiKey"
@@ -160,14 +162,13 @@ export default function LoginPageOriginal() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
               className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white transition-colors ${
                 loading
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-black hover:bg-black/90 focus:ring-2 focus:ring-black focus:ring-offset-2 cursor-pointer hover:cursor-pointer"
+                  : "bg-black hover:bg-black/90 focus:ring-2 focus:ring-black focus:ring-offset-2"
               }`}
             >
               {loading ? (
@@ -182,7 +183,6 @@ export default function LoginPageOriginal() {
           </form>
         </div>
 
-        {/* Footer */}
         <div className="text-center">
           <p className="text-xs text-body">© 2025 Deputeti AI. All rights reserved.</p>
         </div>
@@ -190,4 +190,4 @@ export default function LoginPageOriginal() {
     </div>
   );
 }
-*/ // End of commented login page
+*/

@@ -69,8 +69,47 @@ export function useAgentSession(sessionId: string | null = null) {
         };
         setMessages((prev) => [...prev, userMsg]);
 
-        // Get conversation history for context
+        // Save user message immediately to localStorage (even before backend response)
+        // This ensures conversation is persisted even if backend fails
         const conversationHistory = chatClient.getConversationHistory(activeSessionId);
+        const updatedHistoryWithUser = [...conversationHistory, { role: "user" as const, content: userMessage }];
+        
+        // Save immediately with user message
+        if (typeof window !== 'undefined') {
+          try {
+            const sessionData = {
+              session_id: activeSessionId,
+              messages: updatedHistoryWithUser,
+              last_updated: new Date().toISOString(),
+            };
+            localStorage.setItem(`chat_session_${activeSessionId}`, JSON.stringify(sessionData));
+            
+            // Update sessions list immediately
+            const sessionsJson = localStorage.getItem('chat_sessions_list');
+            let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+            const firstUserMessage = updatedHistoryWithUser.find(m => m.role === 'user');
+            const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+            
+            // Remove existing session if present
+            sessions = sessions.filter(s => s.session_id !== activeSessionId);
+            
+            // Add/update session at the beginning
+            sessions.unshift({
+              session_id: activeSessionId,
+              preview,
+              last_updated: sessionData.last_updated,
+              message_count: updatedHistoryWithUser.length,
+            });
+            
+            localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
+            
+            // Dispatch event to refresh UI
+            window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
+          } catch (saveError) {
+            console.error('[useAgentSession] Error saving user message:', saveError);
+          }
+        }
+        
         console.log('[useAgentSession] Conversation history:', conversationHistory);
         
         // Send to chat API - try with empty history first
@@ -117,10 +156,41 @@ export function useAgentSession(sessionId: string | null = null) {
           setMessages((prev) => [...prev, errorMsg]);
           setError(response?.error || "Failed to get response from assistant");
           
-          // Remove the optimistic user message on error
-          setMessages((prev) => prev.filter((msg, idx) => 
-            !(idx === prev.length - 2 && msg.role === "user" && msg.content === userMessage)
-          ));
+          // Even on error, save the conversation (user message + error message)
+          // This ensures the conversation is still in "Previous Chats"
+          if (typeof window !== 'undefined') {
+            try {
+              const currentHistory = chatClient.getConversationHistory(activeSessionId);
+              const historyWithError = [...currentHistory, { role: "assistant" as const, content: errorContent }];
+              const sessionData = {
+                session_id: activeSessionId,
+                messages: historyWithError,
+                last_updated: new Date().toISOString(),
+              };
+              localStorage.setItem(`chat_session_${activeSessionId}`, JSON.stringify(sessionData));
+              
+              // Update sessions list
+              const sessionsJson = localStorage.getItem('chat_sessions_list');
+              let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+              const firstUserMessage = historyWithError.find(m => m.role === 'user');
+              const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+              
+              sessions = sessions.filter(s => s.session_id !== activeSessionId);
+              sessions.unshift({
+                session_id: activeSessionId,
+                preview,
+                last_updated: sessionData.last_updated,
+                message_count: historyWithError.length,
+              });
+              
+              localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
+              window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
+            } catch (saveError) {
+              console.error('[useAgentSession] Error saving error message:', saveError);
+            }
+          }
+          
+          // Don't remove user message - keep it in the conversation
           
           return null;
         }
@@ -134,10 +204,41 @@ export function useAgentSession(sessionId: string | null = null) {
         };
         setMessages((prev) => [...prev, errorMsg]);
         
-        // Remove the optimistic user message on error
-        setMessages((prev) => prev.filter((msg, idx) => 
-          !(idx === prev.length - 2 && msg.role === "user" && msg.content === userMessage)
-        ));
+        // Even on exception, save the conversation (user message + error message)
+        // This ensures the conversation is still in "Previous Chats"
+        if (typeof window !== 'undefined') {
+          try {
+            const currentHistory = chatClient.getConversationHistory(activeSessionId);
+            const historyWithError = [...currentHistory, { role: "assistant" as const, content: errorMsg.content }];
+            const sessionData = {
+              session_id: activeSessionId,
+              messages: historyWithError,
+              last_updated: new Date().toISOString(),
+            };
+            localStorage.setItem(`chat_session_${activeSessionId}`, JSON.stringify(sessionData));
+            
+            // Update sessions list
+            const sessionsJson = localStorage.getItem('chat_sessions_list');
+            let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+            const firstUserMessage = historyWithError.find(m => m.role === 'user');
+            const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+            
+            sessions = sessions.filter(s => s.session_id !== activeSessionId);
+            sessions.unshift({
+              session_id: activeSessionId,
+              preview,
+              last_updated: sessionData.last_updated,
+              message_count: historyWithError.length,
+            });
+            
+            localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
+            window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
+          } catch (saveError) {
+            console.error('[useAgentSession] Error saving exception message:', saveError);
+          }
+        }
+        
+        // Don't remove user message - keep it in the conversation
         
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         setError(errorMessage);
