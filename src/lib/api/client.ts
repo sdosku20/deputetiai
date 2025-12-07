@@ -49,7 +49,18 @@ class APIClient {
         return response;
       },
       async (error: AxiosError) => {
-        console.error(`[API Client] ❌ ${error.response?.status || 'Network Error'} ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
+        const status = error.response?.status || 'Network Error';
+        const method = error.config?.method?.toUpperCase();
+        const url = error.config?.url;
+        
+        console.error(`[API Client] ❌ ${status} ${method} ${url}`);
+        console.error('[API Client] Error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.config?.headers,
+          requestData: error.config?.data,
+        });
         
         // Handle 401 - invalid API key
         if (error.response?.status === 401) {
@@ -57,6 +68,11 @@ class APIClient {
             localStorage.removeItem('api_key');
             window.location.href = '/login';
           }
+        }
+        
+        // Log full error response for 500 errors
+        if (error.response?.status === 500) {
+          console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
         }
 
         // Handle network errors and timeouts gracefully
@@ -165,12 +181,21 @@ class ChatAPIClient {
         model: this.model,
         messageCount: messages.length,
         sessionId,
+        url: `${API_BASE_URL}/v1/chat/completions`,
+        requestBody: request,
       });
 
       const response = await this.apiClient.post<ChatCompletionResponse>(
         '/v1/chat/completions',
         request
       );
+
+      console.log('[ChatAPI] Response received:', {
+        status: 'success',
+        hasChoices: !!response.choices,
+        choicesLength: response.choices?.length,
+        fullResponse: response,
+      });
 
       // Extract assistant message from response
       const assistantMessage = response.choices?.[0]?.message?.content || '';
@@ -195,11 +220,32 @@ class ChatAPIClient {
         response: assistantMessage,
       };
     } catch (error: any) {
-      console.error('[ChatAPI] Error sending message:', error);
+      console.error('[ChatAPI] Error sending message:', {
+        error,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        fullError: JSON.stringify(error.response?.data, null, 2),
+      });
+      
+      // Try to extract a meaningful error message
+      let errorMessage = 'Failed to send message';
+      
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
         response: '',
-        error: error.response?.data?.error?.message || error.message || 'Failed to send message',
+        error: errorMessage,
       };
     }
   }
