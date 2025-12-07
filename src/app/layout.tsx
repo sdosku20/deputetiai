@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { RootProviders } from "./root-providers";
@@ -19,8 +19,16 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Shfa",
-  description: "Real-time analytics and insights dashboard",
+  title: "Deputeti AI",
+  description: "AI Assistant for EU Law",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover", // For iOS notch support
 };
 
 // Root layout is a Server Component that wraps minimal providers
