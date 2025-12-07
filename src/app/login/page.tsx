@@ -78,7 +78,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const result = await login(apiKey, email || undefined);
+      const result = await login(apiKey, email || '');
 
       if (result.success) {
         router.push("/chat");

@@ -17,7 +17,8 @@ if (typeof window !== 'undefined') {
 /**
  * API Client for Deputeti AI
  * 
- * Uses OpenAI-compatible chat/completions API with X-API-Key authentication
+ * Uses conversation-based API with JWT Bearer token authentication
+ * Endpoint: /api/v1/conversations/{id}/messages
  */
 class APIClient {
   private client: AxiosInstance;
@@ -31,10 +32,10 @@ class APIClient {
       },
     });
 
-    // Request interceptor - attach API key from localStorage
+    // Request interceptor - attach JWT token from localStorage
     this.client.interceptors.request.use(
       (config) => {
-        const apiKey = typeof window !== 'undefined' ? localStorage.getItem('api_key') : null;
+        const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${config.url}`);
         
@@ -53,26 +54,26 @@ class APIClient {
           dataAsJson: requestDataJson,
         });
         
-        // Compare with curl format
-        if (config.url?.includes('/chat/completions')) {
-          console.log('[API Client] 🔍 Comparing with curl format...');
-          console.log('[API Client] Our request:', requestDataJson);
-          console.log('[API Client] Curl format:', '{"model":"eu-law-rag","messages":[{"role":"user","content":"What is Article 50 TEU?"}]}');
-          
-          // CRITICAL: Log exactly what axios will send
-          console.log('[API Client] 🔍 Final request details:');
-          console.log('  - URL:', config.baseURL + config.url);
-          console.log('  - Method:', config.method);
-          console.log('  - Headers:', JSON.stringify(config.headers, null, 2));
-          console.log('  - Data type:', typeof config.data);
-          console.log('  - Data value:', config.data);
+        // Enhanced: Export request details in copyable format for debugging
+        if (config.url?.includes('/conversations') || config.url?.includes('/messages')) {
+          const exportData = {
+            timestamp: new Date().toISOString(),
+            url: config.baseURL + config.url,
+            method: config.method?.toUpperCase(),
+            headers: config.headers,
+            body: config.data,
+            cookies: typeof window !== 'undefined' ? document.cookie : 'N/A (SSR)',
+          };
+          console.log('[API Client] 📋 COPY THIS FOR DEBUGGING:');
+          console.log(JSON.stringify(exportData, null, 2));
         }
         
-        if (apiKey) {
-          config.headers['X-API-Key'] = apiKey;
-          console.log('[API Client] ✓ Added X-API-Key header:', apiKey.substring(0, 10) + '...');
+        if (jwtToken) {
+          config.headers['Authorization'] = `Bearer ${jwtToken}`;
+          console.log('[API Client] ✓ Added Authorization Bearer header:', jwtToken.substring(0, 20) + '...');
         } else {
-          console.log('[API Client] ⚠️ No API key found in localStorage');
+          console.log('[API Client] ⚠️ No JWT token found in localStorage - request may fail if auth required');
+          // Note: Don't block the request - let the backend decide if auth is required
         }
 
         return config;
@@ -87,6 +88,22 @@ class APIClient {
     this.client.interceptors.response.use(
       (response) => {
         console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+        
+        // Enhanced: Export successful response details for debugging
+        if (response.config.url?.includes('/chat/completions')) {
+          const exportData = {
+            timestamp: new Date().toISOString(),
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            data: response.data,
+            requestUrl: response.config.url,
+            requestMethod: response.config.method?.toUpperCase(),
+          };
+          console.log('[API Client] 📋 SUCCESS RESPONSE (COPY FOR DEBUGGING):');
+          console.log(JSON.stringify(exportData, null, 2));
+        }
+        
         return response;
       },
       async (error: AxiosError) => {
@@ -110,17 +127,38 @@ class APIClient {
           requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
         });
         
-        // Handle 401 - invalid API key
+        // Handle 401 - token expired or invalid
         if (error.response?.status === 401) {
           if (typeof window !== 'undefined') {
-            localStorage.removeItem('api_key');
-            window.location.href = '/login';
+            localStorage.removeItem('jwt_token');
+            // Try to auto-login again (don't redirect to login page)
+            // The auto-login in AuthContext will handle re-authentication
+            console.warn('[API Client] 401 Unauthorized - token may have expired, will retry auto-login');
           }
         }
         
         // Log full error response for 500 errors
         if (error.response?.status === 500) {
           console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
+        }
+        
+        // Enhanced: Export error details in copyable format for debugging
+        if (error.config?.url?.includes('/chat/completions')) {
+          const exportData = {
+            timestamp: new Date().toISOString(),
+            status: error.response?.status || 'Network Error',
+            statusText: error.response?.statusText,
+            errorMessage: error.message,
+            errorCode: error.code,
+            responseHeaders: error.response?.headers,
+            responseData: error.response?.data,
+            requestUrl: error.config.url,
+            requestMethod: error.config.method?.toUpperCase(),
+            requestHeaders: error.config.headers,
+            requestData: error.config.data,
+          };
+          console.error('[API Client] 📋 ERROR RESPONSE (COPY FOR DEBUGGING):');
+          console.error(JSON.stringify(exportData, null, 2));
         }
 
         // Handle network errors and timeouts gracefully
@@ -200,21 +238,80 @@ export interface ChatResponse {
 // Session-based message storage (client-side only)
 interface SessionMessages {
   session_id: string;
+  conversation_id?: string; // Backend conversation ID
   messages: ChatMessage[];
   last_updated: string;
 }
 
+// Conversation API response format
+interface ConversationMessageResponse {
+  user_message: {
+    id: string;
+    role: string;
+    content: string;
+    created_at: string;
+  };
+  assistant_message: {
+    id: string;
+    role: string;
+    content: string;
+    sources?: any[];
+    created_at: string;
+  };
+  tracking_id?: number;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  profile: string;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  scope: string;
+}
+
 class ChatAPIClient {
   private apiClient: APIClient;
-  private model: string;
 
   constructor(apiClient: APIClient) {
     this.apiClient = apiClient;
-    this.model = DEFAULT_MODEL;
   }
 
   /**
-   * Send a chat message using OpenAI-compatible format
+   * Get or create a conversation
+   */
+  async getOrCreateConversation(conversationId?: string): Promise<string> {
+    if (conversationId && conversationId.includes('-') && conversationId.length > 30) {
+      // Verify conversation exists (only if it looks like a UUID)
+      try {
+        const conversation = await this.apiClient.get<Conversation>(`/api/v1/conversations/${conversationId}`);
+        if (conversation && conversation.id) {
+          return conversation.id;
+        }
+      } catch (error) {
+        console.warn('[ChatAPI] Conversation not found, creating new one:', error);
+      }
+    }
+
+    // Create new conversation
+    try {
+      const response = await this.apiClient.post<Conversation>('/api/v1/conversations', {
+        title: 'New conversation',
+        profile: 'general',
+      });
+      console.log('[ChatAPI] Created new conversation:', response.id);
+      return response.id;
+    } catch (error: any) {
+      console.error('[ChatAPI] Failed to create conversation:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create conversation';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Send a chat message using conversation-based API
    */
   async sendMessage(
     userMessage: string,
@@ -222,74 +319,41 @@ class ChatAPIClient {
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // Build messages array with conversation history + new user message
-      // Ensure all messages are in correct format (role and content only)
-      const messages: ChatMessage[] = [
-        ...conversationHistory.map(msg => ({
-          role: msg.role as "user" | "assistant" | "system",
-          content: typeof msg.content === 'string' ? msg.content : String(msg.content)
-        })),
-        { role: "user" as const, content: userMessage },
-      ];
+      // Get or create conversation ID
+      // Use sessionId as conversationId if it looks like a UUID, otherwise create new
+      const conversationId = sessionId.includes('-') && sessionId.length > 30 
+        ? await this.getOrCreateConversation(sessionId)
+        : await this.getOrCreateConversation();
 
-      // Validate messages format
-      for (const msg of messages) {
-        if (!msg.role || !msg.content || typeof msg.content !== 'string') {
-          console.error('[ChatAPI] Invalid message format:', msg);
-          throw new Error('Invalid message format');
-        }
-      }
-
-      // Build request matching OpenAI-compatible format exactly
-      // Match the curl example format: {"model": "eu-law-rag", "messages": [...]}
-      // IMPORTANT: Ensure messages array only contains objects with role and content (strings)
-      // Create minimal, clean objects to match curl exactly
-      const cleanMessages: Array<{ role: string; content: string }> = [];
-      for (const msg of messages) {
-        cleanMessages.push({
-          role: String(msg.role).trim(),
-          content: String(msg.content).trim()
-        });
-      }
-
-      // Build request body exactly like curl: {"model": "eu-law-rag", "messages": [...]}
-      const requestBody: { model: string; messages: Array<{ role: string; content: string }> } = {
-        model: String(this.model).trim(),
-        messages: cleanMessages
+      // Build request body: simple {"content": "..."} format
+      const requestBody = {
+        content: userMessage
       };
 
-      // Log what we're actually sending (before axios serialization)
+      // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
-      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
+      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/api/v1/conversations/${conversationId}/messages`);
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
-      console.log('[ChatAPI] Request body (parsed back to verify):', JSON.parse(requestBodyJson));
       console.log('[ChatAPI] Request details:', {
-        model: this.model,
-        messageCount: messages.length,
-        sessionId,
-        messagesPreview: messages.map(m => ({ 
-          role: m.role, 
-          contentLength: m.content.length,
-          contentPreview: m.content.substring(0, 50)
-        }))
+        conversationId,
+        messageLength: userMessage.length,
+        messagePreview: userMessage.substring(0, 50)
       });
 
-      // Send request as object - axios will serialize it properly
-      // The requestBody is a clean object with only model and messages
-      const response = await this.apiClient.post<ChatCompletionResponse>(
-        '/v1/chat/completions',
-        requestBody // Send as object - axios handles JSON serialization
+      // Send request to conversation messages endpoint
+      const response = await this.apiClient.post<ConversationMessageResponse>(
+        `/api/v1/conversations/${conversationId}/messages`,
+        requestBody
       );
 
       console.log('[ChatAPI] Response received:', {
         status: 'success',
-        hasChoices: !!response.choices,
-        choicesLength: response.choices?.length,
+        hasAssistantMessage: !!response.assistant_message,
         fullResponse: response,
       });
 
       // Extract assistant message from response
-      const assistantMessage = response.choices?.[0]?.message?.content || '';
+      const assistantMessage = response.assistant_message?.content || '';
       
       if (!assistantMessage) {
         console.error('[ChatAPI] No assistant message in response:', response);
@@ -301,15 +365,18 @@ class ChatAPIClient {
       }
 
       // Store conversation in localStorage for session management
-      // Save both user message and assistant response
-      this.saveSessionMessages(sessionId, [
-        ...messages,
+      // Map conversationId to sessionId for our UI
+      const messages: ChatMessage[] = [
+        ...conversationHistory,
+        { role: "user", content: userMessage },
         { role: "assistant", content: assistantMessage },
-      ]);
+      ];
+      
+      this.saveSessionMessages(sessionId, messages, conversationId);
 
       // Dispatch event to refresh sessions list in UI
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId } }));
+        window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId, conversationId } }));
       }
 
       return {
@@ -370,9 +437,8 @@ class ChatAPIClient {
         console.error('[ChatAPI] This suggests the backend received data in an unexpected format.');
         console.error('[ChatAPI] Error response:', errorDataStr);
         console.error('[ChatAPI] What we sent:', requestDataStr);
-        console.error('[ChatAPI] Expected format (from curl):', JSON.stringify({
-          model: "eu-law-rag",
-          messages: [{ role: "user", content: "What is Article 50 TEU?" }]
+        console.error('[ChatAPI] Expected format (from working website):', JSON.stringify({
+          content: "What is Article 50 TEU?"
         }, null, 2));
       }
       
@@ -411,12 +477,13 @@ class ChatAPIClient {
   /**
    * Save conversation messages to localStorage
    */
-  private saveSessionMessages(sessionId: string, messages: ChatMessage[]): void {
+  private saveSessionMessages(sessionId: string, messages: ChatMessage[], conversationId?: string): void {
     if (typeof window === 'undefined') return;
     
     try {
       const session: SessionMessages = {
         session_id: sessionId,
+        conversation_id: conversationId,
         messages,
         last_updated: new Date().toISOString(),
       };

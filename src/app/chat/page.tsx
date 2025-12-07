@@ -41,7 +41,7 @@ function ChatPageContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const router = useRouter();
-  const { user: authUser, logout, isAuthenticated } = useAuth();
+  const { user: authUser, logout } = useAuth();
 
   const isMobile = useMediaQuery("(max-width:768px)");
 
@@ -63,18 +63,31 @@ function ChatPageContent() {
 
   // Refresh sessions when component mounts or when route changes
   useEffect(() => {
-    if (isAuthenticated) {
-      refreshSessions();
-    }
-  }, [isAuthenticated, refreshSessions]);
+    // Always refresh sessions (authentication is handled in background)
+    refreshSessions();
+  }, [refreshSessions]);
 
   // Debug: Log environment configuration when page loads
   useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const model = process.env.NEXT_PUBLIC_CHAT_MODEL;
+    
     console.log('=== CHAT PAGE ENVIRONMENT CHECK ===');
-    console.log('API URL:', process.env.NEXT_PUBLIC_API_URL || 'NOT SET (using fallback)');
-    console.log('Model:', process.env.NEXT_PUBLIC_CHAT_MODEL || 'NOT SET (using fallback)');
+    console.log('API URL:', apiUrl || '❌ NOT SET (using fallback)');
+    console.log('Model:', model || '❌ NOT SET (using fallback)');
     console.log('NODE_ENV:', process.env.NODE_ENV);
     console.log('Location:', window.location.href);
+    
+    if (!apiUrl || !model) {
+      console.warn('⚠️ ENVIRONMENT VARIABLES NOT SET IN VERCEL!');
+      console.warn('⚠️ Go to Vercel → Settings → Environment Variables');
+      console.warn('⚠️ Add: NEXT_PUBLIC_API_URL and NEXT_PUBLIC_CHAT_MODEL');
+      console.warn('⚠️ Make sure they are set for ALL environments (Production, Preview, Development)');
+      console.warn('⚠️ Then REDEPLOY your project!');
+    } else {
+      console.log('✅ Environment variables are set correctly!');
+    }
+    
     console.log('====================================');
   }, []);
 
@@ -142,13 +155,7 @@ function ChatPageContent() {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // No authentication required - always show the chat interface
 
   return (
     <ThemeProvider theme={theme}>
@@ -347,7 +354,7 @@ function ChatPageContent() {
                     },
                   }}
                 >
-                  Logout
+                  Clear Chats
                 </Typography>
               </Box>
             </Box>

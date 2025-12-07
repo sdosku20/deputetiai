@@ -20,103 +20,97 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  login: (apiKey: string, email?: string) => Promise<{ success: boolean; error?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Set default user immediately - no authentication required
+  const [user] = useState<User>({
+    id: 'user',
+    email: 'user@deputeti.ai',
+    name: 'User',
+  });
+  const [loading, setLoading] = useState(false); // No loading needed
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Check if API key exists in localStorage
-  const checkAuth = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    
-    const apiKey = localStorage.getItem('api_key');
-    const userEmail = localStorage.getItem('user_email');
-    
-    // AUTO-LOGIN: Set default API key if not present
-    // TODO: Remove this and restore login requirement when needed
-    if (!apiKey) {
-      const defaultApiKey = 'sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4';
-      localStorage.setItem('api_key', defaultApiKey);
-      localStorage.setItem('user_email', 'user@deputeti.ai');
-      setUser({
-        id: 'user',
-        email: 'user@deputeti.ai',
-      });
-      setLoading(false);
-    } else {
-      setUser({
-        id: 'user',
-        email: userEmail || 'user@deputeti.ai',
-      });
-      setLoading(false);
-    }
-    
-    // COMMENTED OUT: Original login requirement
-    // if (apiKey) {
-    //   setUser({
-    //     id: 'user',
-    //     email: userEmail || 'user@deputeti.ai',
-    //   });
-    //   setLoading(false);
-    // } else {
-    //   setUser(null);
-    //   setLoading(false);
-    // }
-  }, []);
-
-  // Initialize auth state on mount
+  // Auto-login in background silently (no blocking, no UI)
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  // Login function - store API key
-  const login = useCallback(async (apiKey: string, email?: string): Promise<{ success: boolean; error?: string }> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Validate API key format (basic check)
-      if (!apiKey || !apiKey.startsWith('sk-')) {
-        setError('Invalid API key format');
-        setLoading(false);
-        return { success: false, error: 'Invalid API key format' };
-      }
-
-      // Store API key
-      localStorage.setItem('api_key', apiKey);
-      if (email) {
-        localStorage.setItem('user_email', email);
-      }
-
-      // Set user state
-      setUser({
-        id: 'user',
-        email: email || 'user@deputeti.ai',
-      });
-
+    if (typeof window === 'undefined') {
       setLoading(false);
-      return { success: true };
-    } catch (err: any) {
-      const errorMessage = err.message || 'Login failed';
-      setError(errorMessage);
-      setLoading(false);
-      return { success: false, error: errorMessage };
+      return;
     }
+
+    // Check if we already have a token
+    const existingToken = localStorage.getItem('jwt_token');
+    if (existingToken) {
+      setLoading(false);
+      // Start background refresh if needed
+      return;
+    }
+
+    // Silently attempt to get JWT token in background (non-blocking)
+    const attemptLogin = async () => {
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
+        
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: 'michael',
+            password: 'IUsedToBeAStrongPass__',
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.access_token || data.token) {
+            localStorage.setItem('jwt_token', data.access_token || data.token);
+            console.log('[AuthContext] Background login successful');
+          }
+        }
+      } catch (err) {
+        // Silently fail - don't block the UI
+        console.warn('[AuthContext] Background login failed (non-blocking):', err);
+      }
+    };
+
+    // Don't wait for login - start it in background
+    attemptLogin();
+    setLoading(false);
   }, []);
 
-  // Logout function
+  // Dummy login function (not used, but required by interface)
+  const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // Silently attempt login in background
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.access_token || data.token) {
+          localStorage.setItem('jwt_token', data.access_token || data.token);
+        }
+      }
+    } catch (err) {
+      // Ignore errors
+    }
+    return { success: true };
+  }, []);
+
+  // Logout function - just clears chat sessions (no redirect, no login required)
   const logout = useCallback(() => {
-    localStorage.removeItem('api_key');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('chat_sessions_list');
-    
     // Clear all chat sessions
     if (typeof window !== 'undefined') {
       const sessionsJson = localStorage.getItem('chat_sessions_list');
@@ -132,16 +126,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       localStorage.removeItem('chat_sessions_list');
     }
-    
-    setUser(null);
-    router.push('/login');
-  }, [router]);
+    // Silently refresh JWT token in background
+    const attemptLogin = async () => {
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'michael',
+            password: 'IUsedToBeAStrongPass__',
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.access_token || data.token) {
+            localStorage.setItem('jwt_token', data.access_token || data.token);
+          }
+        }
+      } catch (err) {
+        // Ignore
+      }
+    };
+    attemptLogin();
+  }, []);
 
   const value: AuthContextType = {
-    user,
-    loading,
-    error,
-    isAuthenticated: !!user,
+    user, // Always set (never null)
+    loading: false, // Never loading
+    error: null,
+    isAuthenticated: true, // Always authenticated (no login required)
     login,
     logout,
   };
