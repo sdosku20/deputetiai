@@ -19,13 +19,12 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentSession } from "@/hooks/useAgentSession";
-import { useConversationSessions } from "@/hooks/useConversationSessions";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemText from "@mui/material/ListItemText";
-import DeleteOutline from "@mui/icons-material/DeleteOutline";
+import { Sidebar } from "@/components/navigation/Sidebar";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import type { NavigationItem } from "@/types/dashboard";
 
+// ===== MUI theme forcing Space Grotesk =====
 const theme = createTheme({
   typography: {
     fontFamily: "'Space Grotesk', sans-serif",
@@ -37,62 +36,53 @@ function ChatPageContent() {
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
 
+  const [displayMessages, setDisplayMessages] = useState([
+    { id: 1, text: "Hello! How can I help you today?", fromUser: false },
+  ]);
   const [input, setInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
 
-  const isMobile = useMediaQuery("(max-width:768px)");
+  // Responsive breakpoints
+  const isMobile = useMediaQuery('(max-width:768px)');
 
-  const sessionId = useMemo(() => {
-    return sessionParam || null;
+  // ChatGPT-style session management:
+  // - If URL has session param, use it (viewing existing conversation)
+  // - If no session param, we're in "new chat" mode (sessionId = null)
+  // - Session ID is created only when first message is sent
+  const sessionId = React.useMemo(() => {
+    return sessionParam || null; // null means "new conversation not yet started"
   }, [sessionParam]);
+  
+  const { messages: agentMessages, loading, sendMessage } = useAgentSession(sessionId);
 
-  const { messages: agentMessages, loading, sendMessage, deleteConversation } =
-    useAgentSession(sessionId);
-  const { sessions, deleteSession, refreshSessions } = useConversationSessions();
+  // Build navigation items (empty for now - no dashboard needed)
+  const navigationItems = useMemo<NavigationItem[]>(() => [], []);
 
-  // COMMENTED OUT: Login requirement removed
-  // Redirect if not authenticated
-  // useEffect(() => {
-  //   if (!isAuthenticated) {
-  //     router.push("/login");
-  //   }
-  // }, [isAuthenticated, router]);
-
-  // Refresh sessions when component mounts or when route changes
-  useEffect(() => {
-    // Always refresh sessions (authentication is handled in background)
-    refreshSessions();
-  }, [refreshSessions]);
-
-  // Debug: Log environment configuration when page loads
-  useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const model = process.env.NEXT_PUBLIC_CHAT_MODEL;
-    
-    console.log('=== CHAT PAGE ENVIRONMENT CHECK ===');
-    console.log('API URL:', apiUrl || '❌ NOT SET (using fallback)');
-    console.log('Model:', model || '❌ NOT SET (using fallback)');
-    console.log('NODE_ENV:', process.env.NODE_ENV);
-    console.log('Location:', window.location.href);
-    
-    if (!apiUrl || !model) {
-      console.warn('⚠️ ENVIRONMENT VARIABLES NOT SET IN VERCEL!');
-      console.warn('⚠️ Go to Vercel → Settings → Environment Variables');
-      console.warn('⚠️ Add: NEXT_PUBLIC_API_URL and NEXT_PUBLIC_CHAT_MODEL');
-      console.warn('⚠️ Make sure they are set for ALL environments (Production, Preview, Development)');
-      console.warn('⚠️ Then REDEPLOY your project!');
-    } else {
-      console.log('✅ Environment variables are set correctly!');
-    }
-    
-    console.log('====================================');
-  }, []);
+  // Format user for PageHeader
+  const userForHeader = authUser ? {
+    id: authUser.id || '',
+    email: authUser.email || '',
+  } : undefined;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [displayMessages]);
+
+  // Sync agent messages to display messages
+  // This ensures displayMessages always reflects the backend state
+  useEffect(() => {
+    // Convert all agent messages to display format (no welcome message in the list)
+    const converted = agentMessages.map((msg, idx) => ({
+      id: idx + 1,
+      text: msg.content,
+      fromUser: msg.role === "user",
+    }));
+    
+    // Always update to ensure we show the latest messages
+    setDisplayMessages(converted);
   }, [agentMessages]);
 
   const handleSend = async () => {
@@ -101,25 +91,28 @@ function ChatPageContent() {
     const userMessageText = input.trim();
     setInput("");
 
+    // ChatGPT-style behavior: Create session ID on first message
     let activeSessionId = sessionId;
     let isNewConversation = false;
-
+    
     if (!activeSessionId) {
-      activeSessionId = `session_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+      // First message in new conversation - generate session ID now
+      activeSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       isNewConversation = true;
     }
 
+    // Send message with the session ID (new or existing)
     const response = await sendMessage(userMessageText, activeSessionId);
 
+    // Update URL only after successful send for new conversations
     if (isNewConversation && response?.success) {
       router.replace(`/chat?session=${activeSessionId}`, { scroll: false });
     }
 
+    // ChatGPT behavior: Refresh sidebar after ANY successful message
     if (response?.success) {
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("conversationCreated"));
+        window.dispatchEvent(new CustomEvent('conversationCreated'));
       }, 500);
     }
   };
@@ -131,236 +124,20 @@ function ChatPageContent() {
     }
   };
 
-  const handleNewChat = () => {
-    router.push("/chat");
-    // Close mobile drawer when starting new chat
-    if (isMobile) {
-      setMobileMenuOpen(false);
-    }
+  const handleLogout = async () => {
+    await logout();
   };
-
-  const handleSessionClick = (sessionId: string) => {
-    router.push(`/chat?session=${sessionId}`);
-    // Close mobile drawer when session is clicked
-    if (isMobile) {
-      setMobileMenuOpen(false);
-    }
-  };
-
-  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    await deleteSession(sessionId);
-    if (sessionParam === sessionId) {
-      router.push("/chat");
-    }
-  };
-
-  // No authentication required - always show the chat interface
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <div style={{ display: "flex", height: "100vh" }}>
-        {/* Sidebar */}
-        {!isMobile && (
-          <Drawer
-            variant="permanent"
-            sx={{
-              width: 260,
-              flexShrink: 0,
-              "& .MuiDrawer-paper": {
-                width: 260,
-                boxSizing: "border-box",
-                backgroundColor: "#ffffff",
-                borderRight: "1px solid #e5e7eb",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Header */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "16px",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  Deputeti AI
-                </Typography>
-              </Box>
-
-              {/* New Chat Button */}
-              <Box sx={{ p: 2, borderBottom: "1px solid #e5e7eb" }}>
-                <Paper
-                  component="button"
-                  onClick={handleNewChat}
-                  sx={{
-                    width: "100%",
-                    p: 1.5,
-                    textAlign: "left",
-                    cursor: "pointer",
-                    border: "1px solid #e5e7eb",
-                    backgroundColor: "#ffffff",
-                    "&:hover": {
-                      backgroundColor: "#f9fafb",
-                    },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >
-                    + New Chat
-                  </Typography>
-                </Paper>
-              </Box>
-
-              {/* Chat History */}
-              <Box
-                sx={{
-                  flex: 1,
-                  overflowY: "auto",
-                  px: 2,
-                  py: 1,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    px: 1,
-                    py: 0.5,
-                    color: "#6b7280",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Previous Chats
-                </Typography>
-                <List dense>
-                  {sessions.map((session) => (
-                    <ListItem
-                      key={session.session_id}
-                      disablePadding
-                      sx={{ mb: 0.5 }}
-                    >
-                      <Box
-                        sx={{
-                          width: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          "& .delete-btn": {
-                            opacity: 0,
-                            transition: "opacity 120ms ease",
-                          },
-                          "&:hover .delete-btn": { opacity: 1 },
-                        }}
-                      >
-                        <ListItemButton
-                          onClick={() => handleSessionClick(session.session_id)}
-                          selected={sessionParam === session.session_id}
-                          sx={{
-                            borderRadius: 1,
-                            flex: 1,
-                            "&.Mui-selected": {
-                              backgroundColor: "#f3f4f6",
-                            },
-                            "&:hover": {
-                              backgroundColor: "#f9fafb",
-                            },
-                          }}
-                        >
-                          <ListItemText
-                            primary={session.preview || "New conversation"}
-                            primaryTypographyProps={{
-                              sx: {
-                                fontSize: "14px",
-                                fontWeight: 400,
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              },
-                            }}
-                          />
-                        </ListItemButton>
-                        <IconButton
-                          className="delete-btn"
-                          size="small"
-                          onClick={(e) =>
-                            handleDeleteSession(session.session_id, e)
-                          }
-                          sx={{
-                            color: "#6b7280",
-                            "&:hover": { color: "#ef4444" },
-                          }}
-                        >
-                          <DeleteOutline fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-
-              {/* User Info */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderTop: "1px solid #e5e7eb",
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {authUser?.email || "User"}
-                </Typography>
-                <Typography
-                  component="button"
-                  onClick={logout}
-                  sx={{
-                    display: "block",
-                    mt: 0.5,
-                    fontSize: "12px",
-                    color: "#ef4444",
-                    cursor: "pointer",
-                    border: "none",
-                    background: "none",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    "&:hover": {
-                      textDecoration: "underline",
-                    },
-                  }}
-                >
-                  Clear Chats
-                </Typography>
-              </Box>
-            </Box>
-          </Drawer>
-        )}
-
+      <div style={{ display: "flex" }}>
+        {/* Desktop Sidebar */}
+        {!isMobile && <Sidebar items={navigationItems} selectedItem="chat" user={{
+          name: authUser?.name || "User",
+          email: authUser?.email || "user@deputeti.ai",
+        }} />}
+        
         {/* Mobile Drawer */}
         {isMobile && (
           <Drawer
@@ -368,407 +145,285 @@ function ChatPageContent() {
             open={mobileMenuOpen}
             onClose={() => setMobileMenuOpen(false)}
             sx={{
-              "& .MuiDrawer-paper": {
-                width: 280,
-                maxWidth: "85vw",
+              '& .MuiDrawer-paper': {
+                width: 240,
               },
             }}
           >
-            <Box
-              sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Header */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "16px",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  Deputeti AI
-                </Typography>
-              </Box>
-
-              {/* New Chat Button */}
-              <Box sx={{ p: 2, borderBottom: "1px solid #e5e7eb" }}>
-                <Paper
-                  component="button"
-                  onClick={handleNewChat}
-                  sx={{
-                    width: "100%",
-                    p: 1.5,
-                    textAlign: "left",
-                    cursor: "pointer",
-                    border: "1px solid #e5e7eb",
-                    backgroundColor: "#ffffff",
-                    "&:hover": {
-                      backgroundColor: "#f9fafb",
-                    },
-                    "&:active": {
-                      backgroundColor: "#f3f4f6",
-                    },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >
-                    + New Chat
-                  </Typography>
-                </Paper>
-              </Box>
-
-              {/* Chat History */}
-              <Box
-                sx={{
-                  flex: 1,
-                  overflowY: "auto",
-                  px: 2,
-                  py: 1,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    px: 1,
-                    py: 0.5,
-                    color: "#6b7280",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Previous Chats
-                </Typography>
-                <List dense>
-                  {sessions.map((session) => (
-                    <ListItem
-                      key={session.session_id}
-                      disablePadding
-                      sx={{ mb: 0.5 }}
-                    >
-                      <Box
-                        sx={{
-                          width: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                        }}
-                      >
-                        <ListItemButton
-                          onClick={() => handleSessionClick(session.session_id)}
-                          selected={sessionParam === session.session_id}
-                          sx={{
-                            borderRadius: 1,
-                            flex: 1,
-                            minHeight: 48,
-                            "&.Mui-selected": {
-                              backgroundColor: "#f3f4f6",
-                            },
-                            "&:hover": {
-                              backgroundColor: "#f9fafb",
-                            },
-                            "&:active": {
-                              backgroundColor: "#f3f4f6",
-                            },
-                          }}
-                        >
-                          <ListItemText
-                            primary={session.preview || "New conversation"}
-                            primaryTypographyProps={{
-                              sx: {
-                                fontSize: "14px",
-                                fontWeight: 400,
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              },
-                            }}
-                          />
-                        </ListItemButton>
-                        <IconButton
-                          size="small"
-                          onClick={(e) =>
-                            handleDeleteSession(session.session_id, e)
-                          }
-                          sx={{
-                            color: "#6b7280",
-                            minWidth: 40,
-                            minHeight: 40,
-                            "&:hover": { color: "#ef4444", backgroundColor: "#fef2f2" },
-                            "&:active": { backgroundColor: "#fee2e2" },
-                          }}
-                        >
-                          <DeleteOutline fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-
-              {/* User Info */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderTop: "1px solid #e5e7eb",
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {authUser?.email || "User"}
-                </Typography>
-                <Typography
-                  component="button"
-                  onClick={logout}
-                  sx={{
-                    display: "block",
-                    mt: 0.5,
-                    fontSize: "12px",
-                    color: "#ef4444",
-                    cursor: "pointer",
-                    border: "none",
-                    background: "none",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    "&:hover": {
-                      textDecoration: "underline",
-                    },
-                    "&:active": {
-                      opacity: 0.8,
-                    },
-                  }}
-                >
-                  Logout
-                </Typography>
-              </Box>
-            </Box>
+            <Sidebar items={navigationItems} selectedItem="chat" user={{
+              name: authUser?.name || "User",
+              email: authUser?.email || "user@deputeti.ai",
+            }} />
           </Drawer>
         )}
-
-        {/* Main Chat Area */}
+        
         <main
           style={{
             flexGrow: 1,
-            display: "flex",
-            flexDirection: "column",
-            backgroundColor: "#f9fafb",
-            height: "100vh",
+            minHeight: "100vh",
+            overflow: "auto",
+            backgroundColor: "#F5F4F1",
+            width: isMobile ? "100%" : "auto",
           }}
         >
-          {/* Mobile Menu Button */}
-          {isMobile && (
-            <Box
-              sx={{
-                position: "fixed",
-                top: 12,
-                left: 12,
-                zIndex: 1100,
-              }}
-            >
-              <IconButton
-                onClick={() => setMobileMenuOpen(true)}
-                sx={{
-                  bgcolor: "white",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  width: 44,
-                  height: 44,
-                  "&:active": {
-                    backgroundColor: "#f3f4f6",
-                  },
-                }}
-                aria-label="Open menu"
-              >
-                <MenuIcon />
-              </IconButton>
-            </Box>
-          )}
-
-          {/* Messages */}
-          <Box
-            sx={{
-              flex: 1,
-              overflowY: "auto",
-              px: { xs: 2, sm: 3 },
-              py: { xs: 2, sm: 3 },
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              alignItems: "center",
-              mt: isMobile ? 6 : 0,
-            }}
+          <DashboardLayout
+            header={
+              <PageHeader
+                breadcrumbItems={[{ label: "AI Insights" }]}
+                user={userForHeader}
+                onLogout={handleLogout}
+              />
+            }
           >
+            {/* Mobile Menu Button */}
+            {isMobile && (
+              <Box
+                sx={{
+                  position: "fixed",
+                  top: 16,
+                  left: 16,
+                  zIndex: 1100,
+                }}
+              >
+                <IconButton
+                  onClick={() => setMobileMenuOpen(true)}
+                  sx={{
+                    bgcolor: "white",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    "&:hover": {
+                      bgcolor: "#f5f5f5",
+                    },
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
+              </Box>
+            )}
+
             <Box
               sx={{
-                width: "100%",
-                maxWidth: { xs: "100%", sm: 768 },
+                height: {
+                  xs: "calc(100vh - 60px)",
+                  sm: "calc(100vh - 70px)",
+                  md: "calc(100vh - 80px)",
+                },
                 display: "flex",
                 flexDirection: "column",
-                gap: 2,
+                bgcolor: "#f5f4f1",
               }}
             >
-              {agentMessages.length === 0 && (
+              {/* Chat area */}
+              <Box
+                aria-busy={loading}
+                sx={{
+                  flex: 1,
+                  overflowY: "auto",
+                  px: { xs: 2, sm: 3 },
+                  py: { xs: 1.5, sm: 2 },
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  alignItems: "center",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  mt: isMobile ? 7 : 0, // Add margin top for mobile menu button
+                }}
+              >
+                <Box sx={{ 
+                  width: "100%", 
+                  maxWidth: { xs: "100%", sm: 600, md: 770 },
+                  display: "flex", 
+                  flexDirection: "column", 
+                  gap: { xs: 1.5, sm: 2 }
+                }}>
+                  {displayMessages.map((msg) => (
+                    <Box
+                      key={msg.id}
+                      sx={{
+                        alignSelf: msg.fromUser ? "flex-end" : "flex-start",
+                        bgcolor: msg.fromUser ? "#e5e7eb" : "transparent",
+                        color: "#111",
+                        p: msg.fromUser ? { xs: 1.25, sm: 1.5 } : 0,
+                        borderRadius: msg.fromUser ? { xs: 16, sm: 20 } : 0,
+                        maxWidth: msg.fromUser ? { xs: "85%", sm: "fit-content" } : "100%",
+                        boxShadow: msg.fromUser ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                        fontSize: { xs: "0.9375rem", sm: "1rem" },
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        wordBreak: "break-word",
+                        "& h1, & h2, & h3, & h4, & h5, & h6": {
+                          fontSize: "inherit",
+                          fontWeight: 600,
+                          marginTop: "0.5em",
+                          marginBottom: "0.5em",
+                        },
+                        "& p": {
+                          marginTop: "0.5em",
+                          marginBottom: "0.5em",
+                        },
+                        "& strong": {
+                          fontWeight: 600,
+                        },
+                        "& em": {
+                          fontStyle: "italic",
+                        },
+                        "& ul, & ol": {
+                          marginLeft: "1.25em",
+                          marginTop: "0.5em",
+                          marginBottom: "0.5em",
+                        },
+                        "& code": {
+                          backgroundColor: "rgba(0,0,0,0.05)",
+                          padding: "0.125em 0.25em",
+                          borderRadius: "0.25em",
+                          fontFamily: "'Courier New', monospace",
+                          fontSize: "0.9em",
+                        },
+                      }}
+                    >
+                      {msg.fromUser ? (
+                        msg.text
+                      ) : (
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p style={{ margin: "0.5em 0" }}>{children}</p>,
+                            strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                            em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      )}
+                    </Box>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </Box>
+              </Box>
+
+              {/* Welcome Message - Only show when no messages, positioned at bottom center */}
+              {displayMessages.length === 0 && (
                 <Box
                   sx={{
-                    textAlign: "center",
-                    py: 8,
-                    color: "#6b7280",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    px: { xs: 2, sm: 3 },
+                    pb: { xs: 2, sm: 3 },
+                    mt: "auto",
                   }}
                 >
                   <Typography
-                    variant="h5"
                     sx={{
-                      mb: 1,
+                      fontSize: { xs: "1rem", sm: "1.25rem", md: "1.5rem" },
+                      fontWeight: 400,
+                      color: "#000000",
                       fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 600,
+                      textAlign: "center",
                     }}
                   >
-                    Welcome to Deputeti AI
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >
-                    Ask me anything about EU law!
+                    Hello! How can I help you today?
                   </Typography>
                 </Box>
               )}
 
-              {agentMessages.map((msg, idx) => (
-                <Box
-                  key={idx}
-                  sx={{
-                    alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                    bgcolor: msg.role === "user" ? "#111827" : "white",
-                    color: msg.role === "user" ? "white" : "#111827",
-                    p: 2,
-                    borderRadius: 2,
-                    maxWidth: { xs: "90%", sm: "85%" },
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  {msg.role === "user" ? (
-                    <Typography
-                      sx={{
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        fontSize: "15px",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {msg.content}
-                    </Typography>
-                  ) : (
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => (
-                          <p style={{ margin: "0.5em 0" }}>{children}</p>
-                        ),
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  )}
-                </Box>
-              ))}
-              <div ref={messagesEndRef} />
-            </Box>
-          </Box>
-
-          {/* Input */}
-          <Box
+              {/* Input */}
+              <Box
+                component="form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!loading) handleSend();
+                }}
                 sx={{
-                  p: { xs: 1.5, sm: 2 },
+                  px: { xs: 1.5, sm: 2 },
+                  py: { xs: 2, sm: 3 },
                   display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
-                  borderTop: "1px solid #e5e7eb",
-                  backgroundColor: "white",
-                  // Prevent input area from being hidden by mobile browser UI
-                  paddingBottom: { xs: "calc(1.5rem + env(safe-area-inset-bottom))", sm: 2 },
-                }}
-          >
-            <Paper
-              component="form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!loading) handleSend();
-              }}
-              sx={{
-                flex: 1,
-                maxWidth: { xs: "100%", sm: 768 },
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                p: 1.5,
-                borderRadius: 3,
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <TextField
-                multiline
-                maxRows={4}
-                placeholder="Ask a question..."
-                variant="standard"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={loading}
-                sx={{
-                  flex: 1,
-                  "& .MuiInputBase-root": {
-                    border: "none",
-                  },
-                }}
-                InputProps={{ disableUnderline: true }}
-              />
-              <IconButton
-                type="submit"
-                disabled={!input.trim() || loading}
-                sx={{
-                  bgcolor: input.trim() ? "black" : "#9ca3af",
-                  color: "white",
-                  "&:hover": {
-                    bgcolor: input.trim() ? "#111" : "#9ca3af",
-                  },
-                  "&.Mui-disabled": {
-                    bgcolor: "#9ca3af",
-                  },
+                  fontFamily: "'Space Grotesk', sans-serif",
                 }}
               >
-                {loading ? (
-                  <CircularProgress size={20} sx={{ color: "white" }} />
-                ) : (
-                  <SendIcon />
-                )}
-              </IconButton>
-            </Paper>
-          </Box>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    flex: 1,
+                    maxWidth: { xs: "100%", sm: 600, md: 771 },
+                    display: "flex",
+                    alignItems: "flex-end",
+                    gap: { xs: 0.5, sm: 1 },
+                    borderRadius: { xs: 5, sm: 7 },
+                    bgcolor: "#ffffff",
+                    border: "1px solid #dbdbdbff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    px: { xs: 1, sm: 1.25 },
+                    py: { xs: 0.75, sm: 0.85 },
+                  }}
+                >
+                  <TextField
+                    multiline
+                    minRows={1}
+                    maxRows={isMobile ? 4 : 6}
+                    placeholder="Ask a question..."
+                    variant="standard"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={loading}
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      pl: 1,
+                      '& .MuiInputBase-root': {
+                        bgcolor: "transparent",
+                        alignItems: "flex-end",
+                      },
+                      '& .MuiInputBase-input': {
+                        px: 0,
+                        py: 0,
+                        fontSize: { xs: '0.92rem', sm: '0.95rem' },
+                        lineHeight: 1.5,
+                        color: '#111',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      },
+                    }}
+                    InputProps={{ disableUnderline: true }}
+                  />
+
+                  <IconButton
+                    type="submit"
+                    disabled={!input.trim() || loading}
+                    sx={{
+                      alignSelf: "flex-end",
+                      borderRadius: "50%",
+                      p: { xs: 0.75, sm: 0.9 },
+                      transition: "all 0.2s ease",
+                      bgcolor: input.trim() ? "black" : "#9ca3af",
+                      color: "white",
+                      "&.Mui-disabled": {
+                        bgcolor: "#9ca3af",
+                        color: "white",
+                        opacity: 1,
+                        cursor: "not-allowed",
+                        border: "none",
+                        boxShadow: "none",
+                      },
+                      ":hover": { bgcolor: input.trim() ? "#111" : "#9ca3af" },
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress size={isMobile ? 16 : 18} thickness={5} sx={{ color: "white" }} />
+                    ) : (
+                      <SendIcon sx={{ fontSize: { xs: "1.15rem", sm: "1.3rem" } }} />
+                    )}
+                  </IconButton>
+                </Paper>
+              </Box>
+            </Box>
+          </DashboardLayout>
         </main>
       </div>
     </ThemeProvider>
   );
 }
 
+// Wrapper component with Suspense for useSearchParams
 function ChatPageWrapper() {
   return (
     <Suspense
@@ -779,6 +434,7 @@ function ChatPageWrapper() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            backgroundColor: "#f5f4f1",
           }}
         >
           <CircularProgress />
@@ -790,9 +446,25 @@ function ChatPageWrapper() {
   );
 }
 
-const ChatPage = dynamic(() => Promise.resolve({ default: ChatPageWrapper }), {
-  ssr: false,
-});
+// Export with dynamic import to prevent SSR hydration issues
+const ChatPage = dynamic(
+  () => Promise.resolve({ default: ChatPageWrapper }),
+  {
+    ssr: false,
+    loading: () => (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f5f4f1",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    ),
+  },
+);
 
 export default ChatPage;
-
