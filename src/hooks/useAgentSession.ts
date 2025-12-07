@@ -112,8 +112,8 @@ export function useAgentSession(sessionId: string | null = null) {
         
         console.log('[useAgentSession] Conversation history:', conversationHistory);
         
-        // Send to chat API - try with empty history first
-        const response = await chatClient.sendMessage(userMessage, activeSessionId, []);
+        // Send to chat API with conversation history for context
+        const response = await chatClient.sendMessage(userMessage, activeSessionId, conversationHistory);
 
         console.log("[useAgentSession] Response received:", {
           success: response?.success,

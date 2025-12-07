@@ -12,7 +12,7 @@
 RAG pipeline error: 'str' object has no attribute 'get'
 ```
 
-## What We're Sending
+## What I am sending
 
 The frontend sends requests in this exact format (matches working curl command):
 
@@ -32,14 +32,15 @@ The frontend sends requests in this exact format (matches working curl command):
 - `X-API-Key: sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4`
 - `Content-Type: application/json`
 
-## Working vs Not Working
+## Not Working
 
-✅ **curl command works:**
+❌ **curl command does not work:**
 ```bash
-curl -X POST "https://asistenti.deputeti.ai/v1/chat/completions" \
-  -H "X-API-Key: sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "eu-law-rag", "messages": [{"role": "user", "content": "What is Article 50 TEU?"}]}'
+curl.exe -X POST "https://asistenti.deputeti.ai/v1/chat/completions" `
+>>   -H "X-API-Key: sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4" `
+>>   -H "Content-Type: application/json" `
+>>   -d '{\"model\": \"eu-law-rag\", \"messages\": [{\"role\": \"user\", \"content\": \"What is Article 50 TEU?\"}]}'
+{"detail":"RAG pipeline error: 'str' object has no attribute 'get'"}
 ```
 
 ❌ **Frontend request (identical format) returns:**
@@ -55,20 +56,6 @@ The error `'str' object has no attribute 'get'` suggests the backend Python code
 1. The backend receives the request body as a string instead of parsed JSON
 2. A field in the request is being treated as a string when it should be a dict
 3. There's a difference in how FastAPI/Python parses the request from browser vs curl
-
-## Request Comparison
-
-Both requests send identical JSON. The only differences could be:
-- HTTP headers (browser may add additional headers)
-- Request encoding
-- How FastAPI parses the request body
-
-## Next Steps for Backend Team
-
-1. Check FastAPI endpoint for `/v1/chat/completions` - verify request body parsing
-2. Add logging to see what the backend actually receives
-3. Check if there's middleware transforming the request
-4. Verify the RAG pipeline input validation/handling
 
 ---
 **Generated:** $(date)  
