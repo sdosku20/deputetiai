@@ -17,7 +17,7 @@ export default function LoginPage() {
   // Redirect authenticated users away from login page
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push("/insights");
+      router.push("/chat");
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -47,7 +47,7 @@ export default function LoginPage() {
 
       if (result.success) {
         // Redirect to chat interface
-        router.push("/insights");
+        router.push("/chat");
       } else {
         setError(result.error || "Login failed. Please check your API key.");
       }
