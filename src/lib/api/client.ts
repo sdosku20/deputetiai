@@ -166,16 +166,31 @@ class ChatAPIClient {
   ): Promise<ChatResponse> {
     try {
       // Build messages array with conversation history + new user message
+      // Ensure all messages are in correct format (role and content only)
       const messages: ChatMessage[] = [
-        ...conversationHistory,
-        { role: "user", content: userMessage },
+        ...conversationHistory.map(msg => ({
+          role: msg.role as "user" | "assistant" | "system",
+          content: typeof msg.content === 'string' ? msg.content : String(msg.content)
+        })),
+        { role: "user" as const, content: userMessage },
       ];
 
-      // Build request matching OpenAI-compatible format
-      // Don't include 'stream' field unless explicitly needed
-      const request: ChatCompletionRequest = {
+      // Validate messages format
+      for (const msg of messages) {
+        if (!msg.role || !msg.content || typeof msg.content !== 'string') {
+          console.error('[ChatAPI] Invalid message format:', msg);
+          throw new Error('Invalid message format');
+        }
+      }
+
+      // Build request matching OpenAI-compatible format exactly
+      // Only include model and messages (match curl example exactly)
+      const request = {
         model: this.model,
-        messages,
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
       };
 
       console.log('[ChatAPI] Sending request:', {
@@ -183,7 +198,8 @@ class ChatAPIClient {
         messageCount: messages.length,
         sessionId,
         url: `${API_BASE_URL}/v1/chat/completions`,
-        requestBody: request,
+        requestBody: JSON.stringify(request, null, 2),
+        messagesPreview: messages.map(m => ({ role: m.role, contentLength: m.content.length }))
       });
 
       const response = await this.apiClient.post<ChatCompletionResponse>(
@@ -230,17 +246,33 @@ class ChatAPIClient {
         fullError: JSON.stringify(error.response?.data, null, 2),
       });
       
-      // Try to extract a meaningful error message
+      // Try to extract a meaningful error message from various error formats
       let errorMessage = 'Failed to send message';
       
-      if (error.response?.data?.error?.message) {
-        errorMessage = error.response.data.error.message;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
+      // Check different possible error response formats
+      const errorData = error.response?.data;
+      if (errorData) {
+        // Try different error message locations
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.detail) {
+          errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+        } else if (errorData.error) {
+          errorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+        } else {
+          errorMessage = JSON.stringify(errorData);
+        }
       } else if (error.message) {
         errorMessage = error.message;
+      }
+      
+      // If we got a 500 error with RAG pipeline error, show it clearly
+      if (error.response?.status === 500 && errorMessage.includes('RAG')) {
+        console.error('[ChatAPI] RAG Pipeline Error - This might be a backend issue. Full error:', errorData);
       }
       
       return {
