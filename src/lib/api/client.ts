@@ -3,6 +3,17 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
 
+// Debug: Log environment on client side (only in browser)
+if (typeof window !== 'undefined') {
+  console.log('[API Config] Environment check:', {
+    API_BASE_URL,
+    DEFAULT_MODEL,
+    env_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    env_MODEL: process.env.NEXT_PUBLIC_CHAT_MODEL,
+    isProduction: process.env.NODE_ENV === 'production',
+  });
+}
+
 /**
  * API Client for Deputeti AI
  * 

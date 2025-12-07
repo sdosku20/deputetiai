@@ -68,6 +68,16 @@ function ChatPageContent() {
     }
   }, [isAuthenticated, refreshSessions]);
 
+  // Debug: Log environment configuration when page loads
+  useEffect(() => {
+    console.log('=== CHAT PAGE ENVIRONMENT CHECK ===');
+    console.log('API URL:', process.env.NEXT_PUBLIC_API_URL || 'NOT SET (using fallback)');
+    console.log('Model:', process.env.NEXT_PUBLIC_CHAT_MODEL || 'NOT SET (using fallback)');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('Location:', window.location.href);
+    console.log('====================================');
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [agentMessages]);

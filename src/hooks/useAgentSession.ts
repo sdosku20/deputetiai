@@ -110,10 +110,22 @@ export function useAgentSession(sessionId: string | null = null) {
           }
         }
         
-        console.log('[useAgentSession] Conversation history:', conversationHistory);
+        // Filter out error messages from conversation history to avoid confusing the backend
+        // Error messages like "RAG pipeline error: ..." shouldn't be sent as context
+        const cleanHistory = conversationHistory.filter(msg => {
+          const content = String(msg.content || '').toLowerCase();
+          // Don't include error messages in conversation history
+          return !content.includes('rag pipeline error') && 
+                 !content.includes('str object has no attribute') &&
+                 !content.includes('failed to send message') &&
+                 !content.includes('request failed');
+        });
         
-        // Send to chat API with conversation history for context
-        const response = await chatClient.sendMessage(userMessage, activeSessionId, conversationHistory);
+        console.log('[useAgentSession] Conversation history (raw):', conversationHistory);
+        console.log('[useAgentSession] Conversation history (cleaned):', cleanHistory);
+        
+        // Send to chat API with cleaned conversation history for context
+        const response = await chatClient.sendMessage(userMessage, activeSessionId, cleanHistory);
 
         console.log("[useAgentSession] Response received:", {
           success: response?.success,
