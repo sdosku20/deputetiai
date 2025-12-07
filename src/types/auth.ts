@@ -4,6 +4,7 @@ export interface User {
   email: string;
   full_name: string | null;
   role: 'user' | 'admin' | 'superadmin';
+  tenant_id: string;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
