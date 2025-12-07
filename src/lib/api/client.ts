@@ -273,10 +273,16 @@ class ChatAPIClient {
       }
 
       // Store conversation in localStorage for session management
+      // Save both user message and assistant response
       this.saveSessionMessages(sessionId, [
         ...messages,
         { role: "assistant", content: assistantMessage },
       ]);
+
+      // Dispatch event to refresh sessions list in UI
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId } }));
+      }
 
       return {
         success: true,
@@ -429,7 +435,10 @@ class ChatAPIClient {
     
     try {
       const stored = localStorage.getItem(`chat_session_${sessionId}`);
-      if (!stored) return;
+      if (!stored) {
+        console.warn(`[ChatAPI] No session found for ${sessionId}, cannot update list`);
+        return;
+      }
       
       const session: SessionMessages = JSON.parse(stored);
       const firstUserMessage = session.messages.find(m => m.role === 'user');
@@ -441,8 +450,8 @@ class ChatAPIClient {
       // Remove existing session if present
       sessions = sessions.filter(s => s.session_id !== sessionId);
       
-      // Add updated session
-      sessions.push({
+      // Add updated session at the beginning (most recent first)
+      sessions.unshift({
         session_id: sessionId,
         preview,
         last_updated: session.last_updated,
@@ -450,6 +459,7 @@ class ChatAPIClient {
       });
       
       localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
+      console.log(`[ChatAPI] Updated sessions list. Total sessions: ${sessions.length}`);
     } catch (error) {
       console.error('[ChatAPI] Error updating sessions list:', error);
     }

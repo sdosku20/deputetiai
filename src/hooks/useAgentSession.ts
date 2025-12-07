@@ -71,10 +71,6 @@ export function useAgentSession(sessionId: string | null = null) {
 
         // Get conversation history for context
         const conversationHistory = chatClient.getConversationHistory(activeSessionId);
-        
-        // TEMPORARY DEBUG: Try WITHOUT history first to isolate the issue
-        // If this works, the problem is with conversation history format
-        // If this fails, the problem is with the basic request format
         console.log('[useAgentSession] Conversation history:', conversationHistory);
         
         // Send to chat API - try with empty history first
@@ -94,6 +90,12 @@ export function useAgentSession(sessionId: string | null = null) {
             timestamp: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, assistantMsg]);
+          
+          // Dispatch event to refresh sessions list
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
+          }
+          
           return response;
         } else {
           // Backend responded but indicated failure

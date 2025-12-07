@@ -24,6 +24,7 @@ export function useConversationSessions() {
       setError(null);
       
       const sessionsList = chatClient.getConversationSessions();
+      console.log(`[useConversationSessions] Loaded ${sessionsList.length} sessions from localStorage`);
       setSessions(sessionsList);
     } catch (err) {
       console.error("Failed to load conversation sessions:", err);
@@ -39,17 +40,34 @@ export function useConversationSessions() {
     loadSessions();
   }, [loadSessions]);
 
-  // Listen for new conversation events and refresh
+  // Listen for conversation events and refresh
   useEffect(() => {
     const handleConversationCreated = () => {
       console.log("[useConversationSessions] New conversation created, refreshing list...");
       loadSessions();
     };
 
+    const handleSessionUpdated = () => {
+      console.log("[useConversationSessions] Session updated, refreshing list...");
+      loadSessions();
+    };
+
+    // Refresh on visibility change (when user comes back to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("[useConversationSessions] Tab visible, refreshing sessions...");
+        loadSessions();
+      }
+    };
+
     window.addEventListener('conversationCreated', handleConversationCreated);
+    window.addEventListener('sessionUpdated', handleSessionUpdated);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('conversationCreated', handleConversationCreated);
+      window.removeEventListener('sessionUpdated', handleSessionUpdated);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [loadSessions]);
 

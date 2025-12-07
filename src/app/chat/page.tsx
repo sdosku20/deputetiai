@@ -51,7 +51,7 @@ function ChatPageContent() {
 
   const { messages: agentMessages, loading, sendMessage, deleteConversation } =
     useAgentSession(sessionId);
-  const { sessions, deleteSession } = useConversationSessions();
+  const { sessions, deleteSession, refreshSessions } = useConversationSessions();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,6 +59,13 @@ function ChatPageContent() {
       router.push("/login");
     }
   }, [isAuthenticated, router]);
+
+  // Refresh sessions when component mounts or when route changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshSessions();
+    }
+  }, [isAuthenticated, refreshSessions]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
