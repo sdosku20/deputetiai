@@ -184,27 +184,34 @@ class ChatAPIClient {
       }
 
       // Build request matching OpenAI-compatible format exactly
-      // Only include model and messages (match curl example exactly)
-      const request = {
+      // Match the curl example format: {"model": "eu-law-rag", "messages": [...]}
+      // Ensure messages array only contains objects with role and content (strings)
+      const requestBody = {
         model: this.model,
         messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
+          role: String(msg.role),
+          content: String(msg.content)
         }))
       };
 
+      // Log what we're actually sending
       console.log('[ChatAPI] Sending request:', {
         model: this.model,
         messageCount: messages.length,
         sessionId,
         url: `${API_BASE_URL}/v1/chat/completions`,
-        requestBody: JSON.stringify(request, null, 2),
-        messagesPreview: messages.map(m => ({ role: m.role, contentLength: m.content.length }))
+        requestBody: JSON.stringify(requestBody, null, 2),
+        messagesPreview: messages.map(m => ({ 
+          role: m.role, 
+          contentLength: m.content.length,
+          contentPreview: m.content.substring(0, 50)
+        }))
       });
 
+      // Send request - axios will automatically serialize to JSON
       const response = await this.apiClient.post<ChatCompletionResponse>(
         '/v1/chat/completions',
-        request
+        requestBody
       );
 
       console.log('[ChatAPI] Response received:', {
@@ -294,7 +301,13 @@ class ChatAPIClient {
       if (!stored) return [];
       
       const session: SessionMessages = JSON.parse(stored);
-      return session.messages || [];
+      const messages = session.messages || [];
+      
+      // Filter to only include role and content fields (strip any extra fields like timestamp)
+      return messages.map(msg => ({
+        role: msg.role as "user" | "assistant" | "system",
+        content: String(msg.content || '')
+      })).filter(msg => msg.role && msg.content);
     } catch (error) {
       console.error('[ChatAPI] Error loading conversation history:', error);
       return [];

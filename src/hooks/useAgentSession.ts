@@ -72,8 +72,13 @@ export function useAgentSession(sessionId: string | null = null) {
         // Get conversation history for context
         const conversationHistory = chatClient.getConversationHistory(activeSessionId);
         
-        // Send to chat API with conversation history
-        const response = await chatClient.sendMessage(userMessage, activeSessionId, conversationHistory);
+        // TEMPORARY DEBUG: Try WITHOUT history first to isolate the issue
+        // If this works, the problem is with conversation history format
+        // If this fails, the problem is with the basic request format
+        console.log('[useAgentSession] Conversation history:', conversationHistory);
+        
+        // Send to chat API - try with empty history first
+        const response = await chatClient.sendMessage(userMessage, activeSessionId, []);
 
         console.log("[useAgentSession] Response received:", {
           success: response?.success,
