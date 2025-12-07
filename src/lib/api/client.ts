@@ -171,10 +171,11 @@ class ChatAPIClient {
         { role: "user", content: userMessage },
       ];
 
+      // Build request matching OpenAI-compatible format
+      // Don't include 'stream' field unless explicitly needed
       const request: ChatCompletionRequest = {
         model: this.model,
         messages,
-        stream: false,
       };
 
       console.log('[ChatAPI] Sending request:', {
