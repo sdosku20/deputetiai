@@ -10,6 +10,8 @@ import TextField from "@mui/material/TextField";
 import IconButton from "@mui/material/IconButton";
 import SendIcon from "@mui/icons-material/Send";
 import MenuIcon from "@mui/icons-material/Menu";
+import LogoutIcon from "@mui/icons-material/Logout";
+import Fab from "@mui/material/Fab";
 import Paper from "@mui/material/Paper";
 import CircularProgress from "@mui/material/CircularProgress";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -418,6 +420,32 @@ function ChatPageContent() {
             </Box>
           </DashboardLayout>
         </main>
+
+        {/* Mobile quick logout / clear chats button */}
+        {isMobile && (
+          <Box
+            sx={{
+              position: "fixed",
+              bottom: 16,
+              right: 16,
+              zIndex: 1300,
+            }}
+          >
+            <Fab
+              size="medium"
+              onClick={handleLogout}
+              sx={{
+                bgcolor: "#111",
+                color: "white",
+                boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                "&:hover": { bgcolor: "#000" },
+              }}
+              aria-label="Clear chats"
+            >
+              <LogoutIcon sx={{ fontSize: 22 }} />
+            </Fab>
+          </Box>
+        )}
       </div>
     </ThemeProvider>
   );
