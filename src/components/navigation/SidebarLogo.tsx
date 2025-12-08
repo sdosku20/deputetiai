@@ -12,8 +12,8 @@ interface SidebarLogoProps {
 export function SidebarLogo({
   logoSrc = "/Albanian_eagle.png",
   alt = "Albanian Eagle Logo",
-  width = 50,
-  height = 40,
+  width = 40,
+  height = 30,
 }: SidebarLogoProps) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", pt: 3, pb: 3, px: 2 }}>
