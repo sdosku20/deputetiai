@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
+const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 // Debug: Log environment on client side (only in browser)
 if (typeof window !== 'undefined') {
@@ -32,10 +33,10 @@ class APIClient {
       },
     });
 
-    // Request interceptor - attach JWT token from localStorage
+    // Request interceptor - attach API key from env or localStorage
     this.client.interceptors.request.use(
       (config) => {
-        const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+        const apiKey = ENV_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('api_key') : null);
 
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${config.url}`);
         
@@ -54,26 +55,12 @@ class APIClient {
           dataAsJson: requestDataJson,
         });
         
-        // Enhanced: Export request details in copyable format for debugging
-        if (config.url?.includes('/conversations') || config.url?.includes('/messages')) {
-          const exportData = {
-            timestamp: new Date().toISOString(),
-            url: config.baseURL + config.url,
-            method: config.method?.toUpperCase(),
-            headers: config.headers,
-            body: config.data,
-            cookies: typeof window !== 'undefined' ? document.cookie : 'N/A (SSR)',
-          };
-          console.log('[API Client] 📋 COPY THIS FOR DEBUGGING:');
-          console.log(JSON.stringify(exportData, null, 2));
-        }
-        
-        if (jwtToken) {
-          config.headers['Authorization'] = `Bearer ${jwtToken}`;
-          console.log('[API Client] ✓ Added Authorization Bearer header:', jwtToken.substring(0, 20) + '...');
+        // Attach API key header for all requests
+        if (apiKey) {
+          config.headers['X-API-Key'] = apiKey;
+          console.log('[API Client] ✓ Added X-API-Key header:', apiKey.substring(0, 10) + '...');
         } else {
-          console.log('[API Client] ⚠️ No JWT token found in localStorage - request may fail if auth required');
-          // Note: Don't block the request - let the backend decide if auth is required
+          console.warn('[API Client] ⚠️ No API key found (set NEXT_PUBLIC_API_KEY or localStorage \"api_key\")');
         }
 
         return config;
@@ -88,21 +75,6 @@ class APIClient {
     this.client.interceptors.response.use(
       (response) => {
         console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-        
-        // Enhanced: Export successful response details for debugging
-        if (response.config.url?.includes('/chat/completions')) {
-          const exportData = {
-            timestamp: new Date().toISOString(),
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            data: response.data,
-            requestUrl: response.config.url,
-            requestMethod: response.config.method?.toUpperCase(),
-          };
-          console.log('[API Client] 📋 SUCCESS RESPONSE (COPY FOR DEBUGGING):');
-          console.log(JSON.stringify(exportData, null, 2));
-        }
         
         return response;
       },
@@ -127,40 +99,12 @@ class APIClient {
           requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
         });
         
-        // Handle 401 - token expired or invalid
-        if (error.response?.status === 401) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('jwt_token');
-            // Try to auto-login again (don't redirect to login page)
-            // The auto-login in AuthContext will handle re-authentication
-            console.warn('[API Client] 401 Unauthorized - token may have expired, will retry auto-login');
-          }
-        }
-        
         // Log full error response for 500 errors
         if (error.response?.status === 500) {
           console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
         }
         
         // Enhanced: Export error details in copyable format for debugging
-        if (error.config?.url?.includes('/chat/completions')) {
-          const exportData = {
-            timestamp: new Date().toISOString(),
-            status: error.response?.status || 'Network Error',
-            statusText: error.response?.statusText,
-            errorMessage: error.message,
-            errorCode: error.code,
-            responseHeaders: error.response?.headers,
-            responseData: error.response?.data,
-            requestUrl: error.config.url,
-            requestMethod: error.config.method?.toUpperCase(),
-            requestHeaders: error.config.headers,
-            requestData: error.config.data,
-          };
-          console.error('[API Client] 📋 ERROR RESPONSE (COPY FOR DEBUGGING):');
-          console.error(JSON.stringify(exportData, null, 2));
-        }
-
         // Handle network errors and timeouts gracefully
         if (error.code === 'ECONNABORTED') {
           console.warn('Request timeout - server may be processing');
@@ -311,7 +255,7 @@ class ChatAPIClient {
   }
 
   /**
-   * Send a chat message using conversation-based API
+   * Send a chat message using OpenAI-compatible /v1/chat/completions
    */
   async sendMessage(
     userMessage: string,
@@ -319,41 +263,39 @@ class ChatAPIClient {
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // Get or create conversation ID
-      // Use sessionId as conversationId if it looks like a UUID, otherwise create new
-      const conversationId = sessionId.includes('-') && sessionId.length > 30 
-        ? await this.getOrCreateConversation(sessionId)
-        : await this.getOrCreateConversation();
+      // Build OpenAI-style request body with history
+      const messages: ChatMessage[] = [
+        ...conversationHistory,
+        { role: "user", content: userMessage },
+      ];
 
-      // Build request body: simple {"content": "..."} format
-      const requestBody = {
-        content: userMessage
+      const requestBody: ChatCompletionRequest = {
+        model: DEFAULT_MODEL,
+        messages,
       };
 
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
-      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/api/v1/conversations/${conversationId}/messages`);
+      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
       console.log('[ChatAPI] Request details:', {
-        conversationId,
-        messageLength: userMessage.length,
-        messagePreview: userMessage.substring(0, 50)
+        messageCount: messages.length,
+        messagePreview: userMessage.substring(0, 80),
       });
 
-      // Send request to conversation messages endpoint
-      const response = await this.apiClient.post<ConversationMessageResponse>(
-        `/api/v1/conversations/${conversationId}/messages`,
+      // Send request to chat completions endpoint
+      const response = await this.apiClient.post<ChatCompletionResponse>(
+        `/v1/chat/completions`,
         requestBody
       );
 
       console.log('[ChatAPI] Response received:', {
         status: 'success',
-        hasAssistantMessage: !!response.assistant_message,
         fullResponse: response,
       });
 
       // Extract assistant message from response
-      const assistantMessage = response.assistant_message?.content || '';
+      const assistantMessage = response.choices?.[0]?.message?.content || '';
       
       if (!assistantMessage) {
         console.error('[ChatAPI] No assistant message in response:', response);
@@ -365,18 +307,16 @@ class ChatAPIClient {
       }
 
       // Store conversation in localStorage for session management
-      // Map conversationId to sessionId for our UI
-      const messages: ChatMessage[] = [
-        ...conversationHistory,
-        { role: "user", content: userMessage },
+      const updatedMessages: ChatMessage[] = [
+        ...messages,
         { role: "assistant", content: assistantMessage },
       ];
       
-      this.saveSessionMessages(sessionId, messages, conversationId);
+      this.saveSessionMessages(sessionId, updatedMessages);
 
       // Dispatch event to refresh sessions list in UI
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId, conversationId } }));
+        window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId } }));
       }
 
       return {

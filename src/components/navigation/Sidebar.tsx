@@ -9,7 +9,6 @@ import { SidebarLogo } from "./SidebarLogo";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { SidebarNavList } from "./SidebarNavList";
 import { SidebarActions } from "./SidebarActions";
-import { SidebarProfile } from "./SidebarProfile";
 
 /**
  * Sidebar Component
@@ -108,9 +107,6 @@ export function Sidebar({
         {/* Queries Section */}
         <SidebarActions />
       </Box>
-
-      {/* Profile Section */}
-      <SidebarProfile user={user} />
     </Drawer>
   );
 }
