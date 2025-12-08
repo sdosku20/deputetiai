@@ -10,15 +10,15 @@ interface SidebarLogoProps {
 }
 
 export function SidebarLogo({
-  logoSrc = "/shfa-logo.svg",
-  alt = "Deputeti AI Logo",
-  width = 30,
-  height = 30,
+  logoSrc = "/Albanian_eagle.png",
+  alt = "Albanian Eagle Logo",
+  width = 50,
+  height = 40,
 }: SidebarLogoProps) {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", pt: 3, pb: 2, px: 2 }}>
+    <Box sx={{ display: "flex", alignItems: "center", pt: 3, pb: 3, px: 2 }}>
       <Box sx={{ width, height, ml: 1 }}>
-        <img src={logoSrc} alt={alt} width={width} height={height} />
+        <img src={logoSrc} alt={alt} width={width} height={height} style={{ objectFit: "contain" }} />
       </Box>
     </Box>
   );
