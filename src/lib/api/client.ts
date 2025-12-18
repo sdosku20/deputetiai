@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { translateToEnglish, translateToAlbanian, translateConversationHistory } from '@/lib/translation/translator';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
@@ -256,6 +257,7 @@ class ChatAPIClient {
 
   /**
    * Send a chat message using OpenAI-compatible /v1/chat/completions
+   * Translates Albanian input to English before sending, and English response to Albanian
    */
   async sendMessage(
     userMessage: string,
@@ -263,10 +265,16 @@ class ChatAPIClient {
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // Build OpenAI-style request body with history
+      // Step 1: Translate user message from Albanian to English (if needed)
+      const translatedUserMessage = await translateToEnglish(userMessage);
+      
+      // Step 2: Translate conversation history (user messages only) from Albanian to English
+      const translatedHistory = await translateConversationHistory(conversationHistory);
+      
+      // Step 3: Build OpenAI-style request body with translated history
       const messages: ChatMessage[] = [
-        ...conversationHistory,
-        { role: "user", content: userMessage },
+        ...translatedHistory,
+        { role: "user", content: translatedUserMessage },
       ];
 
       const requestBody: ChatCompletionRequest = {
@@ -277,13 +285,15 @@ class ChatAPIClient {
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
       console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
+      console.log('[ChatAPI] Original user message (Albanian):', userMessage.substring(0, 80));
+      console.log('[ChatAPI] Translated user message (English):', translatedUserMessage.substring(0, 80));
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
       console.log('[ChatAPI] Request details:', {
         messageCount: messages.length,
-        messagePreview: userMessage.substring(0, 80),
+        messagePreview: translatedUserMessage.substring(0, 80),
       });
 
-      // Send request to chat completions endpoint
+      // Step 4: Send request to chat completions endpoint
       const response = await this.apiClient.post<ChatCompletionResponse>(
         `/v1/chat/completions`,
         requestBody
@@ -294,22 +304,31 @@ class ChatAPIClient {
         fullResponse: response,
       });
 
-      // Extract assistant message from response
-      const assistantMessage = response.choices?.[0]?.message?.content || '';
+      // Step 5: Extract assistant message from response (in English)
+      const assistantMessageEnglish = response.choices?.[0]?.message?.content || '';
       
-      if (!assistantMessage) {
+      if (!assistantMessageEnglish) {
         console.error('[ChatAPI] No assistant message in response:', response);
+        const errorMsg = await translateToAlbanian('No response from assistant').catch(() => 'Nuk u mor përgjigje nga asistenti');
         return {
           success: false,
           response: '',
-          error: 'No response from assistant',
+          error: errorMsg,
         };
       }
 
-      // Store conversation in localStorage for session management
+      // Step 6: Translate assistant response from English to Albanian
+      const assistantMessageAlbanian = await translateToAlbanian(assistantMessageEnglish);
+      
+      console.log('[ChatAPI] Original response (English):', assistantMessageEnglish.substring(0, 80));
+      console.log('[ChatAPI] Translated response (Albanian):', assistantMessageAlbanian.substring(0, 80));
+
+      // Step 7: Store conversation in localStorage for session management
+      // Store original Albanian messages (not translated) so user sees their original question
       const updatedMessages: ChatMessage[] = [
-        ...messages,
-        { role: "assistant", content: assistantMessage },
+        ...conversationHistory,
+        { role: "user", content: userMessage }, // Original Albanian user message
+        { role: "assistant", content: assistantMessageAlbanian }, // Translated Albanian response
       ];
       
       this.saveSessionMessages(sessionId, updatedMessages);
@@ -321,7 +340,7 @@ class ChatAPIClient {
 
       return {
         success: true,
-        response: assistantMessage,
+        response: assistantMessageAlbanian, // Return Albanian translation
       };
     } catch (error: any) {
       // Better error logging
@@ -382,10 +401,13 @@ class ChatAPIClient {
         }, null, 2));
       }
       
+      // Translate error message to Albanian
+      const translatedErrorMessage = await translateToAlbanian(errorMessage).catch(() => errorMessage);
+      
       return {
         success: false,
         response: '',
-        error: errorMessage,
+        error: translatedErrorMessage,
       };
     }
   }
