@@ -319,7 +319,7 @@ function ChatPageContent() {
                       textAlign: "center",
                     }}
                   >
-                    Hello! How can I help you today?
+                    Përshëndetje! Si mundem të të ndihmoj?
                   </Typography>
                 </Box>
               )}
@@ -360,7 +360,7 @@ function ChatPageContent() {
                     multiline
                     minRows={1}
                     maxRows={isMobile ? 4 : 6}
-                    placeholder="Ask a question..."
+                    placeholder="Pyet diçka..."
                     variant="standard"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}

@@ -129,12 +129,12 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
               sx={{ width: 16, height: 16, display: "block" }}
             />
           </Box>
-          New query
+          Bëni një pyetje të re
         </Box>
       </Box>
 
       {/* Queries Section Header */}
-      <SidebarSectionHeader title="Previous Chats" />
+      <SidebarSectionHeader title="Bisedat e mëparshme" />
 
       {/* Conversations Section - Clean Design */}
       <Box sx={{ px: 3, mt: 0.25 }}>
