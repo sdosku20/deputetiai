@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { translateToEnglish, translateToAlbanian, translateConversationHistory, detectAlbanian } from '@/lib/translation/translator';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
+const API_BASE_URL = 'https://eu-law.deputeti.ai/#/chat';
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
 const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
