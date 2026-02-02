@@ -247,6 +247,7 @@ export async function translateToEnglish(text: string): Promise<string> {
 
 /**
  * Translate English text to Albanian
+ * Removes unwanted conversational prefixes like "Yes" or "Po" that translators might add
  */
 export async function translateToAlbanian(text: string): Promise<string> {
   if (!text || !text.trim()) {
@@ -254,8 +255,20 @@ export async function translateToAlbanian(text: string): Promise<string> {
   }
 
   console.log('[Translation] Translating English to Albanian:', text.substring(0, 50));
-  const translated = await translateText(text, 'en', 'sq');
-  console.log('[Translation] Translated result:', translated.substring(0, 50));
+  let translated = await translateText(text, 'en', 'sq');
+  
+  // ALWAYS remove unwanted conversational prefixes - backend never uses them
+  // Remove "Po" (Yes in Albanian) at the start - always remove since backend doesn't use it
+  translated = translated.replace(/^Po\s*,?\s*/i, '');
+  translated = translated.replace(/^Po\s+/i, '');
+  translated = translated.replace(/^Po,\s+/i, '');
+  
+  // Also remove "Yes" if somehow it got translated incorrectly
+  translated = translated.replace(/^Yes\s*,?\s*/i, '');
+  translated = translated.replace(/^Yes\s+/i, '');
+  translated = translated.replace(/^Yes,\s+/i, '');
+  
+  console.log('[Translation] Translated result (cleaned):', translated.substring(0, 50));
   return translated;
 }
 

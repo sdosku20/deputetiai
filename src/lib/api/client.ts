@@ -1,19 +1,39 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { translateToEnglish, translateToAlbanian, translateConversationHistory, detectAlbanian } from '@/lib/translation/translator';
+// TRANSLATION DISABLED - Backend handles translation
+// import { translateToEnglish, translateToAlbanian, translateConversationHistory, detectAlbanian } from '@/lib/translation/translator';
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://asistenti.deputeti.ai';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai/#/chat';
+// API Base URL - use eu-law.deputeti.ai (without #/chat which is frontend route)
+// Note: #/chat is a frontend route, API endpoints are at the root domain
+let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
+
+// Force correct endpoint - remove any hash routes or old endpoints
+if (API_BASE_URL.includes('asistenti.deputeti.ai')) {
+  console.warn('[API Config] ⚠️ Detected old endpoint, forcing to eu-law.deputeti.ai');
+  API_BASE_URL = 'https://eu-law.deputeti.ai';
+}
+// Remove hash routes if accidentally included (they're frontend routes, not API)
+if (API_BASE_URL.includes('#')) {
+  API_BASE_URL = API_BASE_URL.split('#')[0];
+}
+// Ensure no trailing slash
+API_BASE_URL = API_BASE_URL.replace(/\/$/, '');
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
-const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4';
 
 // Debug: Log environment on client side (only in browser)
 if (typeof window !== 'undefined') {
+  // Warn if old endpoint is detected
+  if (API_BASE_URL.includes('asistenti.deputeti.ai')) {
+    console.error('[API Config] ⚠️ WARNING: Using old endpoint! Please set NEXT_PUBLIC_API_URL=https://eu-law.deputeti.ai');
+  }
+  
   console.log('[API Config] Environment check:', {
     API_BASE_URL,
     DEFAULT_MODEL,
     env_API_URL: process.env.NEXT_PUBLIC_API_URL,
     env_MODEL: process.env.NEXT_PUBLIC_CHAT_MODEL,
     isProduction: process.env.NODE_ENV === 'production',
+    usingDefault: !process.env.NEXT_PUBLIC_API_URL,
   });
 }
 
@@ -35,12 +55,25 @@ class APIClient {
       },
     });
 
-    // Request interceptor - attach API key from env or localStorage
+    // Store reference to this for use in interceptors
+    const self = this;
+
+    // Request interceptor - attach JWT Bearer token and/or API key
     this.client.interceptors.request.use(
-      (config) => {
+      async (config) => {
+        // Get JWT token from localStorage (from login) or login if missing
+        let jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+        
+        // If no token, try to get one (this will be async, but axios supports async interceptors)
+        if (!jwtToken && typeof window !== 'undefined') {
+          jwtToken = await self.ensureValidToken();
+        }
+        
+        // Get API key from env or localStorage (fallback)
         const apiKey = ENV_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('api_key') : null);
 
-        console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${config.url}`);
+        const fullUrl = `${config.baseURL}${config.url}`;
+        console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${fullUrl}`);
         
         // Log the actual data that will be sent
         const requestDataForLog = config.data;
@@ -49,20 +82,36 @@ class APIClient {
           : JSON.stringify(requestDataForLog);
         
         console.log('[API Client] Request config:', {
+          fullUrl: fullUrl,
           baseURL: config.baseURL,
           url: config.url,
           method: config.method,
-          headers: config.headers,
+          headers: {
+            ...config.headers,
+            // Mask sensitive headers in logs
+            'Authorization': config.headers['Authorization'] ? 'Bearer ***' : undefined,
+            'X-API-Key': config.headers['X-API-Key'] ? config.headers['X-API-Key'].substring(0, 10) + '...' : undefined,
+          },
           dataType: typeof config.data,
           dataAsJson: requestDataJson,
+          hasJWT: !!config.headers['Authorization'],
+          hasAPIKey: !!config.headers['X-API-Key'],
         });
         
-        // Attach API key header for all requests
+        // Use JWT Bearer token (primary) and API key (secondary) if available
+        if (jwtToken) {
+          config.headers['Authorization'] = `Bearer ${jwtToken}`;
+          console.log('[API Client] ✓ Added Authorization Bearer token');
+        }
+        
+        // Also add API key if available (some endpoints may require both)
         if (apiKey) {
           config.headers['X-API-Key'] = apiKey;
           console.log('[API Client] ✓ Added X-API-Key header:', apiKey.substring(0, 10) + '...');
-        } else {
-          console.warn('[API Client] ⚠️ No API key found (set NEXT_PUBLIC_API_KEY or localStorage \"api_key\")');
+        }
+        
+        if (!jwtToken && !apiKey) {
+          console.warn('[API Client] ⚠️ No authentication found (JWT token or API key)');
         }
 
         return config;
@@ -73,19 +122,20 @@ class APIClient {
       }
     );
 
-    // Response interceptor - handle errors
-    this.client.interceptors.response.use(
-      (response) => {
-        console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-        
-        return response;
-      },
+      // Response interceptor - handle errors and token refresh
+      this.client.interceptors.response.use(
+        (response) => {
+          console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+          
+          return response;
+        },
       async (error: AxiosError) => {
-        const status = error.response?.status || 'Network Error';
+        const status = error.response?.status || error.code || 'Network Error';
         const method = error.config?.method?.toUpperCase();
         const url = error.config?.url;
+        const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
         
-        console.error(`[API Client] ❌ ${status} ${method} ${url}`);
+        console.error(`[API Client] ❌ ${status} ${method} ${fullUrl}`);
         
         // Better error logging - extract data properly
         const responseData = error.response?.data;
@@ -93,12 +143,21 @@ class APIClient {
           ? (typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2))
           : 'No response data';
         
+        // Log comprehensive error details
         console.error('[API Client] Error details:', {
+          errorCode: error.code,
+          errorMessage: error.message,
           status: error.response?.status,
           statusText: error.response?.statusText,
+          fullUrl: fullUrl,
+          baseURL: error.config?.baseURL,
+          url: url,
+          method: method,
           responseData: responseDataStr,
           requestHeaders: JSON.stringify(error.config?.headers || {}, null, 2),
           requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
+          hasJWT: !!error.config?.headers?.['Authorization'],
+          hasAPIKey: !!error.config?.headers?.['X-API-Key'],
         });
         
         // Log full error response for 500 errors
@@ -106,17 +165,89 @@ class APIClient {
           console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
         }
         
+        // Handle 401 Unauthorized - token might be expired, try to refresh
+        if (error.response?.status === 401) {
+          console.warn('[API Client] ⚠️ 401 Unauthorized - token may be expired, attempting to refresh...');
+          
+          // Clear old token
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('jwt_token');
+          }
+          
+          // Try to get a new token
+          if (typeof window !== 'undefined') {
+            try {
+              const newToken = await self.ensureValidToken();
+              if (newToken && error.config) {
+                // Retry the original request with new token
+                error.config.headers['Authorization'] = `Bearer ${newToken}`;
+                console.log('[API Client] ✓ Retrying request with new token');
+                return self.client.request(error.config);
+              }
+            } catch (refreshError) {
+              console.error('[API Client] ❌ Failed to refresh token:', refreshError);
+            }
+          }
+        }
+        
         // Enhanced: Export error details in copyable format for debugging
         // Handle network errors and timeouts gracefully
         if (error.code === 'ECONNABORTED') {
-          console.warn('Request timeout - server may be processing');
-        } else if (error.code === 'ERR_NETWORK') {
-          console.warn('Network error - server may be down');
+          console.error('[API Client] ⚠️ Request timeout - server may be processing');
+        } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+          console.error('[API Client] ⚠️ Network error - Possible causes:');
+          console.error('  1. CORS issue - server may not allow requests from this origin');
+          console.error('  2. Server is down or unreachable');
+          console.error('  3. SSL/certificate issue');
+          console.error('  4. Endpoint does not exist:', fullUrl);
+          console.error('  5. Check browser console Network tab for more details');
+        } else if (error.code === 'ERR_CERT_AUTHORITY_INVALID' || error.code === 'ERR_SSL_PROTOCOL_ERROR') {
+          console.error('[API Client] ⚠️ SSL/Certificate error - server certificate may be invalid');
         }
 
         return Promise.reject(error);
       }
     );
+  }
+
+  // Helper method to ensure we have a valid JWT token
+  private async ensureValidToken(): Promise<string | null> {
+    if (typeof window === 'undefined') return null;
+    
+    let jwtToken = localStorage.getItem('jwt_token');
+    
+    // If no token, try to login
+    if (!jwtToken) {
+      console.log('[API Client] No JWT token found, attempting login...');
+      try {
+        const loginResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'michael',
+            password: 'IUsedToBeAStrongPass__',
+          }),
+        });
+        
+        if (loginResponse.ok) {
+          const loginData = await loginResponse.json();
+          jwtToken = loginData.access_token || loginData.token || null;
+          if (jwtToken) {
+            localStorage.setItem('jwt_token', jwtToken);
+            console.log('[API Client] ✓ Login successful, JWT token obtained');
+          } else {
+            console.error('[API Client] ❌ Login response missing token:', loginData);
+          }
+        } else {
+          const errorText = await loginResponse.text();
+          console.error('[API Client] ❌ Login failed:', loginResponse.status, errorText);
+        }
+      } catch (loginError) {
+        console.error('[API Client] ❌ Login error:', loginError);
+      }
+    }
+    
+    return jwtToken;
   }
 
   // Public methods
@@ -256,44 +387,37 @@ class ChatAPIClient {
     }
   }
 
-  /**
-   * Send a chat message using OpenAI-compatible /v1/chat/completions
-   * 
-   * Behavior:
-   * - If user asks in Albanian → translate input to English, send to backend, translate response to Albanian
-   * - If user asks in English → send as-is, return English response as-is
-   * - Only these two languages are supported (safe if conditions)
-   */
   async sendMessage(
     userMessage: string,
     sessionId: string = "default",
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // Step 1: Detect user message language (Albanian or English)
-      const isUserMessageAlbanian = detectAlbanian(userMessage);
+      // TRANSLATION DISABLED - Backend handles translation, send messages as-is
+      // // Step 1: Detect user message language (Albanian or English)
+      // const isUserMessageAlbanian = detectAlbanian(userMessage);
+      // 
+      // let translatedUserMessage: string;
+      // let translatedHistory: ChatMessage[];
+      // 
+      // // Step 2: Handle translation based on detected language
+      // if (isUserMessageAlbanian) {
+      //   // User asked in Albanian: translate to English for backend
+      //   console.log('[ChatAPI] Detected Albanian input, translating to English');
+      //   translatedUserMessage = await translateToEnglish(userMessage);
+      //   translatedHistory = await translateConversationHistory(conversationHistory);
+      // } else {
+      //   // User asked in English: send as-is (no translation)
+      //   console.log('[ChatAPI] Detected English input, sending as-is');
+      //   translatedUserMessage = userMessage;
+      //   // Keep conversation history as-is for English conversations
+      //   translatedHistory = conversationHistory;
+      // }
       
-      let translatedUserMessage: string;
-      let translatedHistory: ChatMessage[];
-      
-      // Step 2: Handle translation based on detected language
-      if (isUserMessageAlbanian) {
-        // User asked in Albanian: translate to English for backend
-        console.log('[ChatAPI] Detected Albanian input, translating to English');
-        translatedUserMessage = await translateToEnglish(userMessage);
-        translatedHistory = await translateConversationHistory(conversationHistory);
-      } else {
-        // User asked in English: send as-is (no translation)
-        console.log('[ChatAPI] Detected English input, sending as-is');
-        translatedUserMessage = userMessage;
-        // Keep conversation history as-is for English conversations
-        translatedHistory = conversationHistory;
-      }
-      
-      // Step 3: Build OpenAI-style request body
+      // Send messages directly without translation - backend handles it
       const messages: ChatMessage[] = [
-        ...translatedHistory,
-        { role: "user", content: translatedUserMessage },
+        ...conversationHistory,
+        { role: "user", content: userMessage },
       ];
 
       const requestBody: ChatCompletionRequest = {
@@ -304,19 +428,23 @@ class ChatAPIClient {
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
       console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
-      if (isUserMessageAlbanian) {
-        console.log('[ChatAPI] Original user message (Albanian):', userMessage.substring(0, 80));
-        console.log('[ChatAPI] Translated user message (English):', translatedUserMessage.substring(0, 80));
-      } else {
-        console.log('[ChatAPI] User message (English):', userMessage.substring(0, 80));
-      }
+      // TRANSLATION DISABLED
+      // if (isUserMessageAlbanian) {
+      //   console.log('[ChatAPI] Original user message (Albanian):', userMessage.substring(0, 80));
+      //   console.log('[ChatAPI] Translated user message (English):', translatedUserMessage.substring(0, 80));
+      // } else {
+      //   console.log('[ChatAPI] User message (English):', userMessage.substring(0, 80));
+      // }
+      console.log('[ChatAPI] User message:', userMessage.substring(0, 80));
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
       console.log('[ChatAPI] Request details:', {
         messageCount: messages.length,
-        messagePreview: translatedUserMessage.substring(0, 80),
+        messagePreview: userMessage.substring(0, 80),
       });
 
       // Step 4: Send request to chat completions endpoint
+      // Note: Authentication is handled by the request interceptor
+      console.log('[ChatAPI] Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
       const response = await this.apiClient.post<ChatCompletionResponse>(
         `/v1/chat/completions`,
         requestBody
@@ -328,14 +456,64 @@ class ChatAPIClient {
       });
 
       // Step 5: Extract assistant message from response (always in English from backend)
-      const assistantMessageEnglish = response.choices?.[0]?.message?.content || '';
+      let assistantMessageEnglish = response.choices?.[0]?.message?.content || '';
+      
+      // Clean up unwanted "Yes" prefixes - remove from anywhere it appears inappropriately
+      // The webapp doesn't show "Yes" prefix, so we need to match that behavior
+      if (assistantMessageEnglish) {
+        const originalResponse = assistantMessageEnglish;
+        
+        // Remove "Yes" at the very beginning
+        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes\s*,?\s*/i, '');
+        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes,\s+/i, '');
+        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes\s+/i, '');
+        
+        // Remove "Yes" that appears after "Direct Answer" (with or without markdown formatting)
+        // Handle patterns like:
+        // - "Direct Answer\nYes, "
+        // - "**Direct Answer**\nYes, "
+        // - "Direct Answer  \nYes, " (markdown line break: double space + newline)
+        // - "**Direct Answer**  \nYes, " (most common - markdown bold + line break)
+        
+        // Pattern 1: Handle markdown bold with line break: **Direct Answer**  \nYes
+        // This is the most common pattern from the backend
+        assistantMessageEnglish = assistantMessageEnglish.replace(
+          /(\*{2}Direct\s+Answer\*{2}\s{2,}\n+\s*)Yes\s*,?\s*/i,
+          '$1'
+        );
+        
+        // Pattern 2: Handle markdown bold without line break spacing: **Direct Answer**\nYes
+        assistantMessageEnglish = assistantMessageEnglish.replace(
+          /(\*{2}Direct\s+Answer\*{2}\s*\n+\s*)Yes\s*,?\s*/i,
+          '$1'
+        );
+        
+        // Pattern 3: Handle plain "Direct Answer" with markdown line break: Direct Answer  \nYes
+        assistantMessageEnglish = assistantMessageEnglish.replace(
+          /(Direct\s+Answer\s{2,}\n+\s*)Yes\s*,?\s*/i,
+          '$1'
+        );
+        
+        // Pattern 4: Handle plain "Direct Answer" without markdown: Direct Answer\nYes
+        assistantMessageEnglish = assistantMessageEnglish.replace(
+          /(Direct\s+Answer\s*\n+\s*)Yes\s*,?\s*/i,
+          '$1'
+        );
+        
+        if (assistantMessageEnglish !== originalResponse) {
+          console.log('[ChatAPI] Removed unwanted "Yes" prefix from response');
+          console.log('[ChatAPI] Original:', originalResponse.substring(0, 100));
+          console.log('[ChatAPI] Cleaned:', assistantMessageEnglish.substring(0, 100));
+        }
+      }
       
       if (!assistantMessageEnglish) {
         console.error('[ChatAPI] No assistant message in response:', response);
-        // Error message in same language as user input
-        const errorMsg = isUserMessageAlbanian
-          ? await translateToAlbanian('No response from assistant').catch(() => 'Nuk u mor përgjigje nga asistenti')
-          : 'No response from assistant';
+        // TRANSLATION DISABLED - Backend handles error messages
+        // const errorMsg = isUserMessageAlbanian
+        //   ? await translateToAlbanian('No response from assistant').catch(() => 'Nuk u mor përgjigje nga asistenti')
+        //   : 'No response from assistant';
+        const errorMsg = 'No response from assistant';
         return {
           success: false,
           response: '',
@@ -343,23 +521,31 @@ class ChatAPIClient {
         };
       }
 
-      // Step 6: Translate response based on user's input language
-      let finalResponse: string;
-      if (isUserMessageAlbanian) {
-        // User asked in Albanian: translate response to Albanian
-        console.log('[ChatAPI] Translating response to Albanian');
-        finalResponse = await translateToAlbanian(assistantMessageEnglish).catch(() => {
-          console.error('[ChatAPI] Translation failed, returning English response');
-          return assistantMessageEnglish; // Fallback to English if translation fails
-        });
-        console.log('[ChatAPI] Original response (English):', assistantMessageEnglish.substring(0, 80));
-        console.log('[ChatAPI] Translated response (Albanian):', finalResponse.substring(0, 80));
-      } else {
-        // User asked in English: return English response as-is
-        console.log('[ChatAPI] Returning English response (no translation)');
-        finalResponse = assistantMessageEnglish;
-        console.log('[ChatAPI] Response (English):', finalResponse.substring(0, 80));
-      }
+      // TRANSLATION DISABLED - Backend handles translation, return response as-is
+      // // Step 6: Translate response based on user's input language
+      // // IMPORTANT: Only translate if user asked in Albanian. If user asked in English,
+      // // return the English response as-is (no translation) to match webapp behavior.
+      // let finalResponse: string;
+      // if (isUserMessageAlbanian) {
+      //   // User asked in Albanian: translate response to Albanian
+      //   console.log('[ChatAPI] Detected Albanian input, translating response to Albanian');
+      //   finalResponse = await translateToAlbanian(assistantMessageEnglish).catch(() => {
+      //     console.error('[ChatAPI] Translation failed, returning English response');
+      //     return assistantMessageEnglish; // Fallback to English if translation fails
+      //   });
+      //   console.log('[ChatAPI] Original response (English):', assistantMessageEnglish.substring(0, 80));
+      //   console.log('[ChatAPI] Translated response (Albanian):', finalResponse.substring(0, 80));
+      // } else {
+      //   // User asked in English: return English response EXACTLY as received (no translation)
+      //   // This ensures responses match the webapp exactly
+      //   console.log('[ChatAPI] User asked in English, returning response as-is (no translation)');
+      //   finalResponse = assistantMessageEnglish;
+      //   console.log('[ChatAPI] Response (English, no translation):', finalResponse.substring(0, 80));
+      // }
+      
+      // Return response directly from backend without any translation
+      const finalResponse = assistantMessageEnglish;
+      console.log('[ChatAPI] Returning response as-is from backend (no translation):', finalResponse.substring(0, 80));
 
       // Step 7: Store conversation in localStorage for session management
       // Store original user message and final response in user's language
@@ -385,6 +571,9 @@ class ChatAPIClient {
       const errorData = error.response?.data;
       const errorStatus = error.response?.status;
       const errorStatusText = error.response?.statusText;
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url;
       
       // Extract error message properly
       const errorDataStr = errorData 
@@ -395,41 +584,58 @@ class ChatAPIClient {
         ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2))
         : 'No request data';
       
-      console.error('[ChatAPI] Error sending message:', {
+      // Comprehensive error logging
+      console.error('[ChatAPI] ❌ Error sending message:', {
+        errorCode: errorCode,
+        errorMessage: errorMessage,
         status: errorStatus,
         statusText: errorStatusText,
-        errorMessage: error.message,
-        errorCode: error.code,
-        errorResponseData: errorDataStr,
+        fullUrl: fullUrl,
+        baseURL: error.config?.baseURL,
         requestUrl: error.config?.url,
         requestMethod: error.config?.method,
+        errorResponseData: errorDataStr,
         requestData: requestDataStr,
+        hasResponse: !!error.response,
+        isNetworkError: errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error'),
+        isTimeout: errorCode === 'ECONNABORTED',
+        isCORS: errorMessage?.includes('CORS') || errorMessage?.includes('Access-Control'),
       });
       
+      // Special handling for network errors
+      if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
+        console.error('[ChatAPI] 🔍 Network Error Diagnosis:');
+        console.error('  1. Check if endpoint exists:', fullUrl);
+        console.error('  2. Check browser Network tab for CORS errors');
+        console.error('  3. Verify server is reachable');
+        console.error('  4. Check if SSL certificate is valid');
+        console.error('  5. Try opening the URL directly in browser:', fullUrl);
+      }
+      
       // Try to extract a meaningful error message from various error formats
-      let errorMessage = 'Failed to send message';
+      let userErrorMessage = 'Failed to send message';
       
       if (errorData) {
         // Try different error message locations
         if (typeof errorData === 'string') {
-          errorMessage = errorData;
+          userErrorMessage = errorData;
         } else if (errorData.error?.message) {
-          errorMessage = errorData.error.message;
+          userErrorMessage = errorData.error.message;
         } else if (errorData.message) {
-          errorMessage = errorData.message;
+          userErrorMessage = errorData.message;
         } else if (errorData.detail) {
-          errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+          userErrorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
         } else if (errorData.error) {
-          errorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+          userErrorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
         } else {
-          errorMessage = JSON.stringify(errorData);
+          userErrorMessage = JSON.stringify(errorData);
         }
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (errorMessage) {
+        userErrorMessage = errorMessage;
       }
       
       // If we got a 500 error with RAG pipeline error, show it clearly
-      if (errorStatus === 500 && errorMessage.includes('RAG')) {
+      if (errorStatus === 500 && userErrorMessage.includes('RAG')) {
         console.error('[ChatAPI] ⚠️ RAG Pipeline Error detected!');
         console.error('[ChatAPI] This suggests the backend received data in an unexpected format.');
         console.error('[ChatAPI] Error response:', errorDataStr);
@@ -439,18 +645,27 @@ class ChatAPIClient {
         }, null, 2));
       }
       
-      // Translate error message based on user's input language
-      // Detect language from userMessage (safe fallback: assume English if detection fails)
-      const isUserMessageAlbanian = detectAlbanian(userMessage);
-      let translatedErrorMessage: string;
-      
-      if (isUserMessageAlbanian) {
-        // User asked in Albanian: translate error to Albanian
-        translatedErrorMessage = await translateToAlbanian(errorMessage).catch(() => errorMessage);
-      } else {
-        // User asked in English: keep error in English
-        translatedErrorMessage = errorMessage;
+      // For network errors, provide a more helpful message
+      if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
+        userErrorMessage = `Network error: Unable to connect to ${fullUrl}. Please check your connection and try again.`;
       }
+      
+      // TRANSLATION DISABLED - Backend handles error messages
+      // // Translate error message based on user's input language
+      // // Detect language from userMessage (safe fallback: assume English if detection fails)
+      // const isUserMessageAlbanian = detectAlbanian(userMessage);
+      // let translatedErrorMessage: string;
+      // 
+      // if (isUserMessageAlbanian) {
+      //   // User asked in Albanian: translate error to Albanian
+      //   translatedErrorMessage = await translateToAlbanian(userErrorMessage).catch(() => userErrorMessage);
+      // } else {
+      //   // User asked in English: keep error in English
+      //   translatedErrorMessage = userErrorMessage;
+      // }
+      
+      // Return error message as-is (backend handles translation)
+      const translatedErrorMessage = userErrorMessage;
       
       return {
         success: false,

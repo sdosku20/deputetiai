@@ -8,8 +8,11 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import IconButton from "@mui/material/IconButton";
+import Button from "@mui/material/Button";
 import SendIcon from "@mui/icons-material/Send";
 import MenuIcon from "@mui/icons-material/Menu";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import Paper from "@mui/material/Paper";
 import CircularProgress from "@mui/material/CircularProgress";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -41,6 +44,7 @@ function ChatPageContent() {
   ]);
   const [input, setInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
 
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
@@ -127,6 +131,41 @@ function ChatPageContent() {
   const handleLogout = async () => {
     await logout();
   };
+
+  // Parse response to extract "Direct Answer" and rest of content
+  const parseResponse = (text: string): { directAnswer: string; fullContent: string; hasMore: boolean } => {
+    // Look for "Direct Answer" section (case insensitive, with optional formatting)
+    // Pattern: "Direct Answer" followed by newlines and content until next section
+    // Using [\s\S] instead of . with 's' flag for compatibility
+    const directAnswerPattern = /Direct Answer\s*\n+\s*([\s\S]*?)(?=\n+\s*(?:Source Type|Legal Basis|Relevant Text|Context|Related Provisions|SOURCES:|~|$))/i;
+    const directAnswerMatch = text.match(directAnswerPattern);
+    
+    if (directAnswerMatch && directAnswerMatch[1]) {
+      // Include "Direct Answer" heading in the returned text
+      const directAnswer = `Direct Answer\n\n${directAnswerMatch[1].trim()}`;
+      const fullContent = text;
+      const restOfContent = text.substring(directAnswerMatch[0].length).trim();
+      const hasMore = restOfContent.length > 20; // If there's meaningful content after Direct Answer
+      
+      return {
+        directAnswer: directAnswer,
+        fullContent: fullContent,
+        hasMore: hasMore,
+      };
+    }
+    
+    // If no "Direct Answer" section found, return first paragraph or first 500 chars
+    const paragraphs = text.split(/\n\n+/);
+    const firstParagraph = paragraphs[0]?.trim() || text.substring(0, 500).trim();
+    const hasMore = text.length > firstParagraph.length + 100;
+    
+    return {
+      directAnswer: firstParagraph,
+      fullContent: text,
+      hasMore: hasMore,
+    };
+  };
+
 
   return (
     <ThemeProvider theme={theme}>
@@ -235,65 +274,105 @@ function ChatPageContent() {
                   flexDirection: "column", 
                   gap: { xs: 1.5, sm: 2 }
                 }}>
-                  {displayMessages.map((msg) => (
-                    <Box
-                      key={msg.id}
-                      sx={{
-                        alignSelf: msg.fromUser ? "flex-end" : "flex-start",
-                        bgcolor: msg.fromUser ? "#e5e7eb" : "transparent",
-                        color: "#111",
-                        p: msg.fromUser ? { xs: 1.25, sm: 1.5 } : 0,
-                        borderRadius: msg.fromUser ? { xs: 16, sm: 20 } : 0,
-                        maxWidth: msg.fromUser ? { xs: "85%", sm: "fit-content" } : "100%",
-                        boxShadow: msg.fromUser ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
-                        fontSize: { xs: "0.9375rem", sm: "1rem" },
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        wordBreak: "break-word",
-                        "& h1, & h2, & h3, & h4, & h5, & h6": {
-                          fontSize: "inherit",
-                          fontWeight: 600,
-                          marginTop: "0.5em",
-                          marginBottom: "0.5em",
-                        },
-                        "& p": {
-                          marginTop: "0.5em",
-                          marginBottom: "0.5em",
-                        },
-                        "& strong": {
-                          fontWeight: 600,
-                        },
-                        "& em": {
-                          fontStyle: "italic",
-                        },
-                        "& ul, & ol": {
-                          marginLeft: "1.25em",
-                          marginTop: "0.5em",
-                          marginBottom: "0.5em",
-                        },
-                        "& code": {
-                          backgroundColor: "rgba(0,0,0,0.05)",
-                          padding: "0.125em 0.25em",
-                          borderRadius: "0.25em",
-                          fontFamily: "'Courier New', monospace",
-                          fontSize: "0.9em",
-                        },
-                      }}
-                    >
-                      {msg.fromUser ? (
-                        msg.text
-                      ) : (
-                        <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p style={{ margin: "0.5em 0" }}>{children}</p>,
-                            strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                            em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
-                          }}
-                        >
-                          {msg.text}
-                        </ReactMarkdown>
-                      )}
-                    </Box>
-                  ))}
+                  {displayMessages.map((msg) => {
+                    const isUserMessage = msg.fromUser;
+                    
+                    return (
+                      <Box
+                        key={msg.id}
+                        sx={{
+                          alignSelf: isUserMessage ? "flex-end" : "flex-start",
+                          bgcolor: isUserMessage ? "#e5e7eb" : "transparent",
+                          color: "#111",
+                          p: isUserMessage ? { xs: 1.25, sm: 1.5 } : 0,
+                          borderRadius: isUserMessage ? { xs: 16, sm: 20 } : 0,
+                          maxWidth: isUserMessage ? { xs: "85%", sm: "fit-content" } : "100%",
+                          boxShadow: isUserMessage ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                          fontSize: { xs: "0.9375rem", sm: "1rem" },
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          wordBreak: "break-word",
+                          "& h1, & h2, & h3, & h4, & h5, & h6": {
+                            fontSize: "inherit",
+                            fontWeight: 600,
+                            marginTop: "0.5em",
+                            marginBottom: "0.5em",
+                          },
+                          "& p": {
+                            marginTop: "0.5em",
+                            marginBottom: "0.5em",
+                          },
+                          "& strong": {
+                            fontWeight: 600,
+                          },
+                          "& em": {
+                            fontStyle: "italic",
+                          },
+                          "& ul, & ol": {
+                            marginLeft: "1.25em",
+                            marginTop: "0.5em",
+                            marginBottom: "0.5em",
+                          },
+                          "& code": {
+                            backgroundColor: "rgba(0,0,0,0.05)",
+                            padding: "0.125em 0.25em",
+                            borderRadius: "0.25em",
+                            fontFamily: "'Courier New', monospace",
+                            fontSize: "0.9em",
+                          },
+                        }}
+                      >
+                        {isUserMessage ? (
+                          msg.text
+                        ) : (
+                          (() => {
+                            const parsed = parseResponse(msg.text);
+                            const isExpanded = expandedMessages.has(msg.id);
+                            
+                            return (
+                              <Box>
+                                <ReactMarkdown
+                                  components={{
+                                    p: ({ children }) => <p style={{ margin: "0.5em 0" }}>{children}</p>,
+                                    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                                    em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+                                  }}
+                                >
+                                  {isExpanded ? parsed.fullContent : parsed.directAnswer}
+                                </ReactMarkdown>
+                                {parsed.hasMore && (
+                                  <Button
+                                    onClick={() => {
+                                      const newExpanded = new Set(expandedMessages);
+                                      if (isExpanded) {
+                                        newExpanded.delete(msg.id);
+                                      } else {
+                                        newExpanded.add(msg.id);
+                                      }
+                                      setExpandedMessages(newExpanded);
+                                    }}
+                                    size="small"
+                                    sx={{
+                                      mt: 1,
+                                      textTransform: 'none',
+                                      color: '#666',
+                                      fontSize: { xs: '0.875rem', sm: '0.9375rem' },
+                                      fontFamily: "'Space Grotesk', sans-serif",
+                                      '&:hover': {
+                                        backgroundColor: 'rgba(0,0,0,0.05)',
+                                      },
+                                    }}
+                                    startIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                  >
+                                    {isExpanded ? 'Show Less' : 'Show More'}
+                                  </Button>
+                                )}
+                              </Box>
+                            );
+                          })()
+                        )}
+                      </Box>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </Box>
               </Box>
