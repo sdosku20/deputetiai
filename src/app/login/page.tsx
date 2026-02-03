@@ -100,7 +100,7 @@ export default function LoginPage() {
     >
       <div className="w-[400px] space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-black">Deputeti AI</h2>
+          <h2 className="text-3xl font-bold text-black">Gjykata Artificiale</h2>
           <p className="mt-2 text-sm text-body">Login with your API key</p>
         </div>
 
@@ -184,7 +184,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-xs text-body">© 2025 Deputeti AI. All rights reserved.</p>
+          <p className="text-xs text-body">© 2025 Gjykata Artificiale. All rights reserved.</p>
         </div>
       </div>
     </div>

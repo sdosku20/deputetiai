@@ -3,7 +3,8 @@
 /**
  * Auth Context for Deputeti AI
  * 
- * Simplified authentication using API key stored in localStorage
+ * Simplified authentication using API key
+ *  stored in localStorage
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";

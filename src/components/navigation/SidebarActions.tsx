@@ -209,7 +209,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         ) : (
           <Box sx={{ py: 2, textAlign: "center", color: "#9ca3af" }}>
             <Typography sx={{ fontSize: "13px", fontFamily: "'Space Grotesk', sans-serif" }}>
-              No conversations yet
+              Ende nuk ka biseda
             </Typography>
           </Box>
         )}

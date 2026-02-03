@@ -208,7 +208,7 @@ function ChatPageContent() {
           <DashboardLayout
             header={
               <PageHeader
-                breadcrumbItems={[{ label: "AI Insights" }]}
+                breadcrumbItems={[{ label: "Asistenti Ligjor" }]}
                 user={userForHeader}
                 onLogout={handleLogout}
               />

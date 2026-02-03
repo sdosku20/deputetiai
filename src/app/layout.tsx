@@ -19,8 +19,15 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Deputeti AI",
-  description: "AI Assistant for EU Law",
+  title: "Gjykata Artificiale",
+  description: "Asistent IA per ligjet e Shqiperise dhe EU-se",
+  icons: {
+    icon: [
+      { url: '/albania_favicon.png', type: 'image/png' },
+    ],
+    shortcut: '/albania_favicon.png',
+    apple: '/albania_favicon.png',
+  },
 };
 
 export const viewport: Viewport = {
