@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { detectAlbanian } from '@/lib/translation/translator';
 // TRANSLATION DISABLED - Backend handles translation
 // import { translateToEnglish, translateToAlbanian, translateConversationHistory, detectAlbanian } from '@/lib/translation/translator';
 
@@ -393,29 +394,22 @@ class ChatAPIClient {
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // TRANSLATION DISABLED - Backend handles translation, send messages as-is
-      // // Step 1: Detect user message language (Albanian or English)
-      // const isUserMessageAlbanian = detectAlbanian(userMessage);
-      // 
-      // let translatedUserMessage: string;
-      // let translatedHistory: ChatMessage[];
-      // 
-      // // Step 2: Handle translation based on detected language
-      // if (isUserMessageAlbanian) {
-      //   // User asked in Albanian: translate to English for backend
-      //   console.log('[ChatAPI] Detected Albanian input, translating to English');
-      //   translatedUserMessage = await translateToEnglish(userMessage);
-      //   translatedHistory = await translateConversationHistory(conversationHistory);
-      // } else {
-      //   // User asked in English: send as-is (no translation)
-      //   console.log('[ChatAPI] Detected English input, sending as-is');
-      //   translatedUserMessage = userMessage;
-      //   // Keep conversation history as-is for English conversations
-      //   translatedHistory = conversationHistory;
-      // }
+      // Detect the language of the current user message to ensure backend responds in the same language
+      const isUserMessageAlbanian = detectAlbanian(userMessage);
+      const responseLanguage = isUserMessageAlbanian ? 'Albanian' : 'English';
       
-      // Send messages directly without translation - backend handles it
+      console.log('[ChatAPI] Detected language:', responseLanguage, 'for message:', userMessage.substring(0, 50));
+      
+      // Add a system message to instruct the backend to respond in the language of the current user message
+      // This ensures the backend responds in the correct language regardless of conversation history
+      const systemMessage: ChatMessage = {
+        role: "system",
+        content: `IMPORTANT: Respond to the user's current message in ${responseLanguage}. The user's current message is in ${responseLanguage}. Do not use the conversation history to determine the response language - always respond in the same language as the user's current message.`
+      };
+      
+      // Send messages with system instruction and conversation history
       const messages: ChatMessage[] = [
+        systemMessage,
         ...conversationHistory,
         { role: "user", content: userMessage },
       ];
