@@ -135,7 +135,7 @@ function ChatPageContent() {
   // Parse response: show Direct Answer by default, hide sources/legal details behind button
   const parseResponse = (text: string): { visiblePart: string; fullContent: string; hasMore: boolean; isAlbanian: boolean } => {
     // Try Albanian section headings first
-    const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore)\s*\*{0,2}\s*\n/i;
+    const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore|Burimi Ligjor)\s*\*{0,2}\s*\n/i;
     const albanianMatch = text.match(albanianPattern);
     
     if (albanianMatch && albanianMatch.index !== undefined) {
