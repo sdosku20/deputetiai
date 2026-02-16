@@ -1,7 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { detectAlbanian } from '@/lib/translation/translator';
-// TRANSLATION DISABLED - Backend handles translation
-// import { translateToEnglish, translateToAlbanian, translateConversationHistory, detectAlbanian } from '@/lib/translation/translator';
+// ALL TRANSLATION DISABLED - Backend handles everything
+// No language detection, no system messages, no translation from frontend
 
 // API Base URL - use eu-law.deputeti.ai (without #/chat which is frontend route)
 // Note: #/chat is a frontend route, API endpoints are at the root domain
@@ -394,23 +393,10 @@ class ChatAPIClient {
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
     try {
-      // Detect the language of the current user message to ensure backend responds in the same language
-      const isUserMessageAlbanian = detectAlbanian(userMessage);
-      const responseLanguage = isUserMessageAlbanian ? 'Albanian' : 'English';
-      
-      console.log('[ChatAPI] Detected language:', responseLanguage, 'for message:', userMessage.substring(0, 50));
-      
-      // Add a system message to instruct the backend to respond in the language of the current user message
-      // This ensures the backend responds in the correct language regardless of conversation history
-      const systemMessage: ChatMessage = {
-        role: "system",
-        content: `IMPORTANT: Respond to the user's current message in ${responseLanguage}. The user's current message is in ${responseLanguage}. Do not use the conversation history to determine the response language - always respond in the same language as the user's current message.`
-      };
-      
-      // Send messages with system instruction and conversation history
+      // Send ONLY the user message to the backend
+      // No system message, no conversation history - backend handles everything
+      // This ensures we get the same response as the backend webapp
       const messages: ChatMessage[] = [
-        systemMessage,
-        ...conversationHistory,
         { role: "user", content: userMessage },
       ];
 
@@ -422,13 +408,6 @@ class ChatAPIClient {
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
       console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
-      // TRANSLATION DISABLED
-      // if (isUserMessageAlbanian) {
-      //   console.log('[ChatAPI] Original user message (Albanian):', userMessage.substring(0, 80));
-      //   console.log('[ChatAPI] Translated user message (English):', translatedUserMessage.substring(0, 80));
-      // } else {
-      //   console.log('[ChatAPI] User message (English):', userMessage.substring(0, 80));
-      // }
       console.log('[ChatAPI] User message:', userMessage.substring(0, 80));
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
       console.log('[ChatAPI] Request details:', {
@@ -449,104 +428,27 @@ class ChatAPIClient {
         fullResponse: response,
       });
 
-      // Step 5: Extract assistant message from response (always in English from backend)
-      let assistantMessageEnglish = response.choices?.[0]?.message?.content || '';
+      // Extract assistant message from response - return EXACTLY as received from backend
+      const assistantMessage = response.choices?.[0]?.message?.content || '';
       
-      // Clean up unwanted "Yes" prefixes - remove from anywhere it appears inappropriately
-      // The webapp doesn't show "Yes" prefix, so we need to match that behavior
-      if (assistantMessageEnglish) {
-        const originalResponse = assistantMessageEnglish;
-        
-        // Remove "Yes" at the very beginning
-        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes\s*,?\s*/i, '');
-        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes,\s+/i, '');
-        assistantMessageEnglish = assistantMessageEnglish.replace(/^Yes\s+/i, '');
-        
-        // Remove "Yes" that appears after "Direct Answer" (with or without markdown formatting)
-        // Handle patterns like:
-        // - "Direct Answer\nYes, "
-        // - "**Direct Answer**\nYes, "
-        // - "Direct Answer  \nYes, " (markdown line break: double space + newline)
-        // - "**Direct Answer**  \nYes, " (most common - markdown bold + line break)
-        
-        // Pattern 1: Handle markdown bold with line break: **Direct Answer**  \nYes
-        // This is the most common pattern from the backend
-        assistantMessageEnglish = assistantMessageEnglish.replace(
-          /(\*{2}Direct\s+Answer\*{2}\s{2,}\n+\s*)Yes\s*,?\s*/i,
-          '$1'
-        );
-        
-        // Pattern 2: Handle markdown bold without line break spacing: **Direct Answer**\nYes
-        assistantMessageEnglish = assistantMessageEnglish.replace(
-          /(\*{2}Direct\s+Answer\*{2}\s*\n+\s*)Yes\s*,?\s*/i,
-          '$1'
-        );
-        
-        // Pattern 3: Handle plain "Direct Answer" with markdown line break: Direct Answer  \nYes
-        assistantMessageEnglish = assistantMessageEnglish.replace(
-          /(Direct\s+Answer\s{2,}\n+\s*)Yes\s*,?\s*/i,
-          '$1'
-        );
-        
-        // Pattern 4: Handle plain "Direct Answer" without markdown: Direct Answer\nYes
-        assistantMessageEnglish = assistantMessageEnglish.replace(
-          /(Direct\s+Answer\s*\n+\s*)Yes\s*,?\s*/i,
-          '$1'
-        );
-        
-        if (assistantMessageEnglish !== originalResponse) {
-          console.log('[ChatAPI] Removed unwanted "Yes" prefix from response');
-          console.log('[ChatAPI] Original:', originalResponse.substring(0, 100));
-          console.log('[ChatAPI] Cleaned:', assistantMessageEnglish.substring(0, 100));
-        }
-      }
-      
-      if (!assistantMessageEnglish) {
+      if (!assistantMessage) {
         console.error('[ChatAPI] No assistant message in response:', response);
-        // TRANSLATION DISABLED - Backend handles error messages
-        // const errorMsg = isUserMessageAlbanian
-        //   ? await translateToAlbanian('No response from assistant').catch(() => 'Nuk u mor përgjigje nga asistenti')
-        //   : 'No response from assistant';
-        const errorMsg = 'No response from assistant';
         return {
           success: false,
           response: '',
-          error: errorMsg,
+          error: 'No response from assistant',
         };
       }
 
-      // TRANSLATION DISABLED - Backend handles translation, return response as-is
-      // // Step 6: Translate response based on user's input language
-      // // IMPORTANT: Only translate if user asked in Albanian. If user asked in English,
-      // // return the English response as-is (no translation) to match webapp behavior.
-      // let finalResponse: string;
-      // if (isUserMessageAlbanian) {
-      //   // User asked in Albanian: translate response to Albanian
-      //   console.log('[ChatAPI] Detected Albanian input, translating response to Albanian');
-      //   finalResponse = await translateToAlbanian(assistantMessageEnglish).catch(() => {
-      //     console.error('[ChatAPI] Translation failed, returning English response');
-      //     return assistantMessageEnglish; // Fallback to English if translation fails
-      //   });
-      //   console.log('[ChatAPI] Original response (English):', assistantMessageEnglish.substring(0, 80));
-      //   console.log('[ChatAPI] Translated response (Albanian):', finalResponse.substring(0, 80));
-      // } else {
-      //   // User asked in English: return English response EXACTLY as received (no translation)
-      //   // This ensures responses match the webapp exactly
-      //   console.log('[ChatAPI] User asked in English, returning response as-is (no translation)');
-      //   finalResponse = assistantMessageEnglish;
-      //   console.log('[ChatAPI] Response (English, no translation):', finalResponse.substring(0, 80));
-      // }
-      
-      // Return response directly from backend without any translation
-      const finalResponse = assistantMessageEnglish;
-      console.log('[ChatAPI] Returning response as-is from backend (no translation):', finalResponse.substring(0, 80));
+      // Return response directly from backend - no modifications, no translation
+      const finalResponse = assistantMessage;
+      console.log('[ChatAPI] Returning response as-is from backend:', finalResponse.substring(0, 80));
 
-      // Step 7: Store conversation in localStorage for session management
-      // Store original user message and final response in user's language
+      // Store conversation in localStorage for session management
       const updatedMessages: ChatMessage[] = [
         ...conversationHistory,
-        { role: "user", content: userMessage }, // Original user message (Albanian or English)
-        { role: "assistant", content: finalResponse }, // Response in same language as input
+        { role: "user", content: userMessage },
+        { role: "assistant", content: finalResponse },
       ];
       
       this.saveSessionMessages(sessionId, updatedMessages);
@@ -558,7 +460,7 @@ class ChatAPIClient {
 
       return {
         success: true,
-        response: finalResponse, // Return in same language as user input
+        response: finalResponse,
       };
     } catch (error: any) {
       // Better error logging
@@ -644,21 +546,7 @@ class ChatAPIClient {
         userErrorMessage = `Network error: Unable to connect to ${fullUrl}. Please check your connection and try again.`;
       }
       
-      // TRANSLATION DISABLED - Backend handles error messages
-      // // Translate error message based on user's input language
-      // // Detect language from userMessage (safe fallback: assume English if detection fails)
-      // const isUserMessageAlbanian = detectAlbanian(userMessage);
-      // let translatedErrorMessage: string;
-      // 
-      // if (isUserMessageAlbanian) {
-      //   // User asked in Albanian: translate error to Albanian
-      //   translatedErrorMessage = await translateToAlbanian(userErrorMessage).catch(() => userErrorMessage);
-      // } else {
-      //   // User asked in English: keep error in English
-      //   translatedErrorMessage = userErrorMessage;
-      // }
-      
-      // Return error message as-is (backend handles translation)
+      // Return error message as-is
       const translatedErrorMessage = userErrorMessage;
       
       return {

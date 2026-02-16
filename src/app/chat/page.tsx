@@ -132,38 +132,30 @@ function ChatPageContent() {
     await logout();
   };
 
-  // Parse response to extract "Direct Answer" and rest of content
-  const parseResponse = (text: string): { directAnswer: string; fullContent: string; hasMore: boolean } => {
-    // Look for "Direct Answer" section (case insensitive, with optional formatting)
-    // Pattern: "Direct Answer" followed by newlines and content until next section
-    // Using [\s\S] instead of . with 's' flag for compatibility
-    const directAnswerPattern = /Direct Answer\s*\n+\s*([\s\S]*?)(?=\n+\s*(?:Source Type|Legal Basis|Relevant Text|Context|Related Provisions|SOURCES:|~|$))/i;
-    const directAnswerMatch = text.match(directAnswerPattern);
+  // Parse response: show Direct Answer by default, hide sources/legal details behind button
+  const parseResponse = (text: string): { visiblePart: string; fullContent: string; hasMore: boolean; isAlbanian: boolean } => {
+    // Try Albanian section headings first
+    const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore)\s*\*{0,2}\s*\n/i;
+    const albanianMatch = text.match(albanianPattern);
     
-    if (directAnswerMatch && directAnswerMatch[1]) {
-      // Include "Direct Answer" heading in the returned text
-      const directAnswer = `Direct Answer\n\n${directAnswerMatch[1].trim()}`;
-      const fullContent = text;
-      const restOfContent = text.substring(directAnswerMatch[0].length).trim();
-      const hasMore = restOfContent.length > 20; // If there's meaningful content after Direct Answer
-      
-      return {
-        directAnswer: directAnswer,
-        fullContent: fullContent,
-        hasMore: hasMore,
-      };
+    if (albanianMatch && albanianMatch.index !== undefined) {
+      const visiblePart = text.substring(0, albanianMatch.index).trim();
+      const hiddenPart = text.substring(albanianMatch.index).trim();
+      return { visiblePart, fullContent: text, hasMore: hiddenPart.length > 20, isAlbanian: true };
     }
     
-    // If no "Direct Answer" section found, return first paragraph or first 500 chars
-    const paragraphs = text.split(/\n\n+/);
-    const firstParagraph = paragraphs[0]?.trim() || text.substring(0, 500).trim();
-    const hasMore = text.length > firstParagraph.length + 100;
+    // Try English section headings
+    const englishPattern = /\n\s*\*{0,2}\s*(?:Source Type|Legal Basis)\s*\*{0,2}\s*\n/i;
+    const englishMatch = text.match(englishPattern);
     
-    return {
-      directAnswer: firstParagraph,
-      fullContent: text,
-      hasMore: hasMore,
-    };
+    if (englishMatch && englishMatch.index !== undefined) {
+      const visiblePart = text.substring(0, englishMatch.index).trim();
+      const hiddenPart = text.substring(englishMatch.index).trim();
+      return { visiblePart, fullContent: text, hasMore: hiddenPart.length > 20, isAlbanian: false };
+    }
+    
+    // No metadata section found - show everything, no button
+    return { visiblePart: text, fullContent: text, hasMore: false, isAlbanian: false };
   };
 
 
@@ -337,7 +329,7 @@ function ChatPageContent() {
                                     em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
                                   }}
                                 >
-                                  {isExpanded ? parsed.fullContent : parsed.directAnswer}
+                                  {isExpanded ? parsed.fullContent : parsed.visiblePart}
                                 </ReactMarkdown>
                                 {parsed.hasMore && (
                                   <Button
@@ -354,16 +346,24 @@ function ChatPageContent() {
                                     sx={{
                                       mt: 1,
                                       textTransform: 'none',
-                                      color: '#666',
-                                      fontSize: { xs: '0.875rem', sm: '0.9375rem' },
+                                      color: '#555',
+                                      fontSize: { xs: '0.8rem', sm: '0.85rem' },
                                       fontFamily: "'Space Grotesk', sans-serif",
+                                      borderTop: '1px solid #e0e0e0',
+                                      borderRadius: 0,
+                                      pt: 1,
+                                      width: '100%',
+                                      justifyContent: 'flex-start',
                                       '&:hover': {
-                                        backgroundColor: 'rgba(0,0,0,0.05)',
+                                        backgroundColor: 'rgba(0,0,0,0.03)',
                                       },
                                     }}
-                                    startIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                    startIcon={isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                                   >
-                                    {isExpanded ? 'Show Less' : 'Show More'}
+                                    {isExpanded
+                                      ? (parsed.isAlbanian ? 'Fshih Burimet & Detajet' : 'Hide Sources & Details')
+                                      : (parsed.isAlbanian ? 'Shfaq Burimet & Detajet Ligjore' : 'Show Sources & Legal Details')
+                                    }
                                   </Button>
                                 )}
                               </Box>
