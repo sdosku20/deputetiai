@@ -13,6 +13,8 @@ import SendIcon from "@mui/icons-material/Send";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import Paper from "@mui/material/Paper";
 import CircularProgress from "@mui/material/CircularProgress";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -37,6 +39,7 @@ const theme = createTheme({
 
 function ChatPageContent() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const chatContainerRef = React.useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
 
@@ -46,6 +49,22 @@ function ChatPageContent() {
   const [input, setInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateScrollState = React.useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    setCanScrollUp(el.scrollTop > 50);
+    setCanScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 50);
+  }, []);
+
+  const scrollToTop = () => {
+    chatContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const scrollToBottom = () => {
+    chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+  };
 
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
@@ -74,7 +93,9 @@ function ChatPageContent() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [displayMessages]);
+    // Update scroll buttons after content changes
+    setTimeout(updateScrollState, 100);
+  }, [displayMessages, expandedMessages, updateScrollState]);
 
   // Sync agent messages to display messages
   // This ensures displayMessages always reflects the backend state
@@ -252,6 +273,8 @@ function ChatPageContent() {
             >
               {/* Chat area */}
               <Box
+                ref={chatContainerRef}
+                onScroll={updateScrollState}
                 aria-busy={loading}
                 sx={{
                   flex: 1,
@@ -550,6 +573,46 @@ function ChatPageContent() {
                     )}
                   </IconButton>
                 </Paper>
+                {/* Scroll to top / bottom buttons */}
+                {(canScrollUp || canScrollDown) && (
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.25,
+                    ml: { xs: 0.5, sm: 1 },
+                    alignSelf: 'flex-end',
+                    mb: 0.25,
+                  }}>
+                    <IconButton
+                      onClick={scrollToTop}
+                      size="small"
+                      sx={{
+                        p: 0.4,
+                        opacity: canScrollUp ? 1 : 0,
+                        pointerEvents: canScrollUp ? 'auto' : 'none',
+                        color: '#aaa',
+                        transition: 'opacity 0.2s',
+                        '&:hover': { color: '#666', bgcolor: 'rgba(0,0,0,0.05)' },
+                      }}
+                    >
+                      <KeyboardArrowUpIcon sx={{ fontSize: '1.1rem' }} />
+                    </IconButton>
+                    <IconButton
+                      onClick={scrollToBottom}
+                      size="small"
+                      sx={{
+                        p: 0.4,
+                        opacity: canScrollDown ? 1 : 0,
+                        pointerEvents: canScrollDown ? 'auto' : 'none',
+                        color: '#aaa',
+                        transition: 'opacity 0.2s',
+                        '&:hover': { color: '#666', bgcolor: 'rgba(0,0,0,0.05)' },
+                      }}
+                    >
+                      <KeyboardArrowDownIcon sx={{ fontSize: '1.1rem' }} />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
             </Box>
           </DashboardLayout>
