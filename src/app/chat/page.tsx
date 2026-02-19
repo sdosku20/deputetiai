@@ -140,7 +140,8 @@ function ChatPageContent() {
     const cleanText = refMatch ? text.substring(0, refMatch.index!).trim() : text;
     
     // Try Albanian section headings first
-    const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore|Burimi Ligjor)\s*\*{0,2}\s*\n/i;
+    // const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore|Burimi Ligjor)\s*\*{0,2}\s*\n/i;
+    const albanianPattern = /^\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore|Burimi Ligjor)\s*\*{0,2}\s*/im;
     const albanianMatch = cleanText.match(albanianPattern);
     
     if (albanianMatch && albanianMatch.index !== undefined) {
