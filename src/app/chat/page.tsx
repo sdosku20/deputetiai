@@ -20,6 +20,7 @@ import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentSession } from "@/hooks/useAgentSession";
 import { Sidebar } from "@/components/navigation/Sidebar";
@@ -329,10 +330,46 @@ function ChatPageContent() {
                             return (
                               <Box>
                                 <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
                                   components={{
                                     p: ({ children }) => <p style={{ margin: "0.5em 0" }}>{children}</p>,
                                     strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
                                     em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+                                    table: ({ children }) => (
+                                      <Box sx={{ overflowX: 'auto', my: 1.5 }}>
+                                        <table style={{
+                                          width: '100%',
+                                          borderCollapse: 'collapse',
+                                          fontSize: '0.875rem',
+                                          fontFamily: "'Space Grotesk', sans-serif",
+                                        }}>
+                                          {children}
+                                        </table>
+                                      </Box>
+                                    ),
+                                    thead: ({ children }) => (
+                                      <thead style={{ backgroundColor: '#f5f5f5' }}>{children}</thead>
+                                    ),
+                                    th: ({ children }) => (
+                                      <th style={{
+                                        padding: '8px 12px',
+                                        borderBottom: '2px solid #ddd',
+                                        textAlign: 'left',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap',
+                                      }}>
+                                        {children}
+                                      </th>
+                                    ),
+                                    td: ({ children }) => (
+                                      <td style={{
+                                        padding: '8px 12px',
+                                        borderBottom: '1px solid #eee',
+                                        verticalAlign: 'top',
+                                      }}>
+                                        {children}
+                                      </td>
+                                    ),
                                   }}
                                 >
                                   {isExpanded ? parsed.fullContent : parsed.visiblePart}
