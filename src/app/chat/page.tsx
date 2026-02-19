@@ -133,29 +133,34 @@ function ChatPageContent() {
   };
 
   // Parse response: show Direct Answer by default, hide sources/legal details behind button
-  const parseResponse = (text: string): { visiblePart: string; fullContent: string; hasMore: boolean; isAlbanian: boolean } => {
+  const parseResponse = (text: string): { visiblePart: string; fullContent: string; hasMore: boolean; isAlbanian: boolean; refId: string | null } => {
+    // Extract ref ID (appended by our API client) and strip it from content
+    const refMatch = text.match(/\n\nref: ([a-f0-9]{8})\s*$/i);
+    const refId = refMatch ? refMatch[1] : null;
+    const cleanText = refMatch ? text.substring(0, refMatch.index!).trim() : text;
+    
     // Try Albanian section headings first
     const albanianPattern = /\n\s*\*{0,2}\s*(?:Burimi i Konceptit|Lloji i Burimit|Bazë Ligjore|Burimi Ligjor)\s*\*{0,2}\s*\n/i;
-    const albanianMatch = text.match(albanianPattern);
+    const albanianMatch = cleanText.match(albanianPattern);
     
     if (albanianMatch && albanianMatch.index !== undefined) {
-      const visiblePart = text.substring(0, albanianMatch.index).trim();
-      const hiddenPart = text.substring(albanianMatch.index).trim();
-      return { visiblePart, fullContent: text, hasMore: hiddenPart.length > 20, isAlbanian: true };
+      const visiblePart = cleanText.substring(0, albanianMatch.index).trim();
+      const hiddenPart = cleanText.substring(albanianMatch.index).trim();
+      return { visiblePart, fullContent: cleanText, hasMore: hiddenPart.length > 20, isAlbanian: true, refId };
     }
     
     // Try English section headings
     const englishPattern = /\n\s*\*{0,2}\s*(?:Source Type|Legal Basis)\s*\*{0,2}\s*\n/i;
-    const englishMatch = text.match(englishPattern);
+    const englishMatch = cleanText.match(englishPattern);
     
     if (englishMatch && englishMatch.index !== undefined) {
-      const visiblePart = text.substring(0, englishMatch.index).trim();
-      const hiddenPart = text.substring(englishMatch.index).trim();
-      return { visiblePart, fullContent: text, hasMore: hiddenPart.length > 20, isAlbanian: false };
+      const visiblePart = cleanText.substring(0, englishMatch.index).trim();
+      const hiddenPart = cleanText.substring(englishMatch.index).trim();
+      return { visiblePart, fullContent: cleanText, hasMore: hiddenPart.length > 20, isAlbanian: false, refId };
     }
     
     // No metadata section found - show everything, no button
-    return { visiblePart: text, fullContent: text, hasMore: false, isAlbanian: false };
+    return { visiblePart: cleanText, fullContent: cleanText, hasMore: false, isAlbanian: false, refId };
   };
 
 
@@ -365,6 +370,20 @@ function ChatPageContent() {
                                       : (parsed.isAlbanian ? 'Shfaq Burimet & Detajet Ligjore' : 'Show Sources & Legal Details')
                                     }
                                   </Button>
+                                )}
+                                {parsed.refId && (
+                                  <Typography
+                                    component="div"
+                                    sx={{
+                                      mt: 1.5,
+                                      fontSize: '0.65rem',
+                                      color: '#bbb',
+                                      fontFamily: "'Courier New', monospace",
+                                      userSelect: 'all',
+                                    }}
+                                  >
+                                    ref: {parsed.refId}
+                                  </Typography>
                                 )}
                               </Box>
                             );

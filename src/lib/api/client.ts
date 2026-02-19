@@ -423,8 +423,14 @@ class ChatAPIClient {
         requestBody
       );
 
+      // Extract 8-char reference ID from response for backend tracking
+      const rawId = response.id || '';
+      const refId = rawId.replace('chatcmpl-', '').substring(0, 8) || '';
+
       console.log('[ChatAPI] Response received:', {
         status: 'success',
+        rawId,
+        refId,
         fullResponse: response,
       });
 
@@ -440,9 +446,11 @@ class ChatAPIClient {
         };
       }
 
-      // Return response directly from backend - no modifications, no translation
-      const finalResponse = assistantMessage;
-      console.log('[ChatAPI] Returning response as-is from backend:', finalResponse.substring(0, 80));
+      // Append reference ID to content so it persists in localStorage
+      const finalResponse = refId
+        ? `${assistantMessage}\n\nref: ${refId}`
+        : assistantMessage;
+      console.log('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
 
       // Store conversation in localStorage for session management
       const updatedMessages: ChatMessage[] = [
