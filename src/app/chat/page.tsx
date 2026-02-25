@@ -93,9 +93,14 @@ function ChatPageContent() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    // Update scroll buttons after content changes
+    // Update scroll buttons after new messages render
     setTimeout(updateScrollState, 100);
-  }, [displayMessages, expandedMessages, updateScrollState]);
+  }, [displayMessages, updateScrollState]);
+
+  useEffect(() => {
+    // Refresh scroll button visibility on expand/collapse without forcing scroll-to-bottom
+    setTimeout(updateScrollState, 100);
+  }, [expandedMessages, updateScrollState]);
 
   // Sync agent messages to display messages
   // This ensures displayMessages always reflects the backend state
