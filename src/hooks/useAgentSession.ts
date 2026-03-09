@@ -211,7 +211,7 @@ export function useAgentSession(sessionId: string | null = null) {
         
         const errorMsg: AgentMessage = {
           role: "assistant",
-          content: "Request failed. Please check your API key and try again.",
+          content: "Request failed. Please try again.",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);

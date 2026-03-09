@@ -18,7 +18,6 @@ if (API_BASE_URL.includes('#')) {
 // Ensure no trailing slash
 API_BASE_URL = API_BASE_URL.replace(/\/$/, '');
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
-const ENV_API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'sk-KnCx-6j3M7uukpWXw8G32Vq110tqtu0xrowrxEHhP_4';
 
 // Debug: Log environment on client side (only in browser)
 if (typeof window !== 'undefined') {
@@ -58,7 +57,7 @@ class APIClient {
     // Store reference to this for use in interceptors
     const self = this;
 
-    // Request interceptor - attach JWT Bearer token and/or API key
+    // Request interceptor - attach JWT Bearer token
     this.client.interceptors.request.use(
       async (config) => {
         // Get JWT token from localStorage (from login) or login if missing
@@ -69,9 +68,6 @@ class APIClient {
           jwtToken = await self.ensureValidToken();
         }
         
-        // Get API key from env or localStorage (fallback)
-        const apiKey = ENV_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('api_key') : null);
-
         const fullUrl = `${config.baseURL}${config.url}`;
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${fullUrl}`);
         
@@ -90,28 +86,20 @@ class APIClient {
             ...config.headers,
             // Mask sensitive headers in logs
             'Authorization': config.headers['Authorization'] ? 'Bearer ***' : undefined,
-            'X-API-Key': config.headers['X-API-Key'] ? config.headers['X-API-Key'].substring(0, 10) + '...' : undefined,
           },
           dataType: typeof config.data,
           dataAsJson: requestDataJson,
           hasJWT: !!config.headers['Authorization'],
-          hasAPIKey: !!config.headers['X-API-Key'],
         });
         
-        // Use JWT Bearer token (primary) and API key (secondary) if available
+        // Use JWT Bearer token if available
         if (jwtToken) {
           config.headers['Authorization'] = `Bearer ${jwtToken}`;
           console.log('[API Client] ✓ Added Authorization Bearer token');
         }
-        
-        // Also add API key if available (some endpoints may require both)
-        if (apiKey) {
-          config.headers['X-API-Key'] = apiKey;
-          console.log('[API Client] ✓ Added X-API-Key header:', apiKey.substring(0, 10) + '...');
-        }
-        
-        if (!jwtToken && !apiKey) {
-          console.warn('[API Client] ⚠️ No authentication found (JWT token or API key)');
+
+        if (!jwtToken) {
+          console.warn('[API Client] ⚠️ No JWT token found');
         }
 
         return config;
@@ -157,7 +145,6 @@ class APIClient {
           requestHeaders: JSON.stringify(error.config?.headers || {}, null, 2),
           requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
           hasJWT: !!error.config?.headers?.['Authorization'],
-          hasAPIKey: !!error.config?.headers?.['X-API-Key'],
         });
         
         // Log full error response for 500 errors
@@ -407,7 +394,7 @@ class ChatAPIClient {
 
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
-      console.log('[ChatAPI] 📤 Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
+      console.log('[ChatAPI] 📤 Sending request to local proxy:', '/api/chat');
       console.log('[ChatAPI] User message:', userMessage.substring(0, 80));
       console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
       console.log('[ChatAPI] Request details:', {
@@ -415,13 +402,14 @@ class ChatAPIClient {
         messagePreview: userMessage.substring(0, 80),
       });
 
-      // Step 4: Send request to chat completions endpoint
-      // Note: Authentication is handled by the request interceptor
-      console.log('[ChatAPI] Sending request to:', `${API_BASE_URL}/v1/chat/completions`);
-      const response = await this.apiClient.post<ChatCompletionResponse>(
-        `/v1/chat/completions`,
-        requestBody
-      );
+      // Step 4: Send request via local proxy to keep API key server-side
+      const proxyResponse = await axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 120000,
+      });
+      const response = proxyResponse.data;
 
       // Extract 8-char reference ID from response for backend tracking
       const rawId = response.id || '';
@@ -516,26 +504,21 @@ class ChatAPIClient {
         console.error('  5. Try opening the URL directly in browser:', fullUrl);
       }
       
-      // Try to extract a meaningful error message from various error formats
-      let userErrorMessage = 'Failed to send message';
-      
-      if (errorData) {
-        // Try different error message locations
-        if (typeof errorData === 'string') {
-          userErrorMessage = errorData;
-        } else if (errorData.error?.message) {
-          userErrorMessage = errorData.error.message;
-        } else if (errorData.message) {
-          userErrorMessage = errorData.message;
-        } else if (errorData.detail) {
-          userErrorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
-        } else if (errorData.error) {
-          userErrorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
-        } else {
-          userErrorMessage = JSON.stringify(errorData);
-        }
-      } else if (errorMessage) {
-        userErrorMessage = errorMessage;
+      // Build a production-safe user message (avoid leaking endpoint URLs/internal details)
+      let userErrorMessage = 'Something went wrong while processing your request. Please try again.';
+
+      if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
+        userErrorMessage = 'Network issue detected. Please check your connection and try again.';
+      } else if (errorCode === 'ECONNABORTED') {
+        userErrorMessage = 'The request is taking longer than expected. Please try again.';
+      } else if (errorStatus === 401 || errorStatus === 403) {
+        userErrorMessage = 'Authentication failed. Please sign in again.';
+      } else if (errorStatus === 429) {
+        userErrorMessage = 'Too many requests at the moment. Please wait a bit and try again.';
+      } else if (typeof errorStatus === 'number' && errorStatus >= 500) {
+        userErrorMessage = 'The service is temporarily unavailable. Please try again in a moment.';
+      } else if (typeof errorStatus === 'number' && errorStatus >= 400) {
+        userErrorMessage = 'The request could not be completed. Please verify your input and try again.';
       }
       
       // If we got a 500 error with RAG pipeline error, show it clearly
@@ -547,11 +530,6 @@ class ChatAPIClient {
         console.error('[ChatAPI] Expected format (from working website):', JSON.stringify({
           content: "What is Article 50 TEU?"
         }, null, 2));
-      }
-      
-      // For network errors, provide a more helpful message
-      if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
-        userErrorMessage = `Network error: Unable to connect to ${fullUrl}. Please check your connection and try again.`;
       }
       
       // Return error message as-is
