@@ -80,7 +80,14 @@ function ChatPageContent() {
     return sessionParam || null; // null means "new conversation not yet started"
   }, [sessionParam]);
   
-  const { messages: agentMessages, loading, sendMessage } = useAgentSession(sessionId);
+  const {
+    messages: agentMessages,
+    loading,
+    error,
+    lastFailedUserMessage,
+    sendMessage,
+    retryLastMessage,
+  } = useAgentSession(sessionId);
 
   // Build navigation items (empty for now - no dashboard needed)
   const navigationItems = useMemo<NavigationItem[]>(() => [], []);
@@ -157,6 +164,12 @@ function ChatPageContent() {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleRetryLast = async () => {
+    if (!loading) {
+      await retryLastMessage();
+    }
   };
 
   // Parse response: show Direct Answer by default, hide sources/legal details behind button
@@ -485,6 +498,57 @@ function ChatPageContent() {
                   >
                     Përshëndetje! Si mundem të të ndihmoj?
                   </Typography>
+                </Box>
+              )}
+
+              {/* Input error/retry row */}
+              {(error || lastFailedUserMessage) && (
+                <Box
+                  sx={{
+                    px: { xs: 1.5, sm: 2 },
+                    pt: { xs: 1, sm: 1.5 },
+                    display: "flex",
+                    justifyContent: "center",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: "100%",
+                      maxWidth: { xs: "100%", sm: 600, md: 771 },
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                        color: "#666",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {error || "Last message failed."}
+                    </Typography>
+                    {lastFailedUserMessage && (
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={handleRetryLast}
+                        disabled={loading}
+                        sx={{
+                          textTransform: "none",
+                          minWidth: "auto",
+                          color: "#333",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
               )}
 

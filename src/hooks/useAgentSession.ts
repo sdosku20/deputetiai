@@ -11,6 +11,7 @@ export function useAgentSession(sessionId: string | null = null) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastFailedUserMessage, setLastFailedUserMessage] = useState<string | null>(null);
 
   // Load conversation history from localStorage when sessionId changes
   const loadConversationHistory = useCallback(async () => {
@@ -134,6 +135,7 @@ export function useAgentSession(sessionId: string | null = null) {
         });
 
         if (response && response.success && response.response) {
+          setLastFailedUserMessage(null);
           // Add assistant response
           const assistantMsg: AgentMessage = {
             role: "assistant",
@@ -167,6 +169,7 @@ export function useAgentSession(sessionId: string | null = null) {
           };
           setMessages((prev) => [...prev, errorMsg]);
           setError(response?.error || "Failed to get response from assistant");
+          setLastFailedUserMessage(userMessage);
           
           // Even on error, save the conversation (user message + error message)
           // This ensures the conversation is still in "Previous Chats"
@@ -215,6 +218,7 @@ export function useAgentSession(sessionId: string | null = null) {
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
+        setLastFailedUserMessage(userMessage);
         
         // Even on exception, save the conversation (user message + error message)
         // This ensures the conversation is still in "Previous Chats"
@@ -278,11 +282,20 @@ export function useAgentSession(sessionId: string | null = null) {
     }
   }, [sessionId]);
 
+  const retryLastMessage = useCallback(async (): Promise<ChatResponse | null> => {
+    if (!lastFailedUserMessage || loading) {
+      return null;
+    }
+    return sendMessage(lastFailedUserMessage);
+  }, [lastFailedUserMessage, loading, sendMessage]);
+
   return {
     messages,
     loading,
     error,
+    lastFailedUserMessage,
     sendMessage,
+    retryLastMessage,
     deleteConversation,
     refreshHistory: loadConversationHistory,
     clearError: () => setError(null),

@@ -387,9 +387,10 @@ class ChatAPIClient {
         { role: "user", content: userMessage },
       ];
 
-      const requestBody: ChatCompletionRequest = {
-        model: DEFAULT_MODEL,
-        messages,
+      // Send an abstracted payload to the local proxy. The proxy builds the
+      // backend OpenAI-compatible shape server-side.
+      const requestBody = {
+        prompt: userMessage,
       };
 
       // Log what we're actually sending
