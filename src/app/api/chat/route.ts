@@ -17,9 +17,7 @@ type ChatProxyRequest = {
 
 type UpstreamChatResponse = {
   id?: string;
-  object?: string;
   created?: number;
-  model?: string;
   choices?: unknown;
   usage?: unknown;
 };
@@ -131,9 +129,7 @@ export async function POST(request: NextRequest) {
         const parsed = JSON.parse(responseText) as UpstreamChatResponse;
         const safeResponse = {
           id: parsed.id,
-          object: parsed.object,
           created: parsed.created,
-          model: parsed.model,
           choices: parsed.choices,
           usage: parsed.usage,
         };
