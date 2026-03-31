@@ -10,11 +10,14 @@ export function SidebarSectionHeader({ title }: SidebarSectionHeaderProps) {
     <Typography
       variant="h6"
       sx={{
-        fontSize: "14px",
-        fontWeight: 400,
-        color: "#6b7280",
-        ml: 3,
-        fontFamily: "'Space Grotesk', sans-serif",
+        fontSize: "0.7rem",
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "hsl(var(--text-muted))",
+        px: 2.5,
+        py: 0.5,
+        lineHeight: 1.2,
       }}
     >
       {title}

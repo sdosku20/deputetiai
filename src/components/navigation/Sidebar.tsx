@@ -1,27 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 // Optimized: Direct imports instead of barrel imports (saves 10-15KB)
 import Drawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
+import CompareArrowsOutlinedIcon from "@mui/icons-material/CompareArrowsOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import type { NavigationItem } from "@/types/dashboard";
 import { SidebarLogo } from "./SidebarLogo";
-import { SidebarSectionHeader } from "./SidebarSectionHeader";
-import { SidebarNavList } from "./SidebarNavList";
 import { SidebarActions } from "./SidebarActions";
-
-/**
- * Sidebar Component
- * Matches EXACT styling from root frontend SideMenu.tsx
- * - 240px fixed width
- * - White background
- * - Space Grotesk font throughout
- * - Logo section (30x30px)
- * - Scrollable content section with "Dashboard" and "Actions" headers
- * - Profile avatar section at bottom (120px height)
- * - Hover: #f9f8f6
- * - Selected: #f4f3ef, fontWeight 600
- */
 
 interface SidebarProps {
   items: NavigationItem[];
@@ -36,45 +26,36 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  items,
-  selectedItem,
-  onItemSelect,
+  items: _items,
+  selectedItem: _selectedItem,
+  onItemSelect: _onItemSelect,
   user = {
     name: "User",
     email: "user@example.com",
   },
   className,
 }: SidebarProps) {
-  const router = useRouter();
+  void _items;
+  void _selectedItem;
+  void _onItemSelect;
 
-  // Handle navigation item click
-  const handleItemClick = (item: NavigationItem) => {
-    // If item has onClick handler, use that (for filtering)
-    if (item.onClick) {
-      item.onClick();
-      return;
-    }
-
-    // Otherwise use traditional navigation
-    if (onItemSelect) {
-      onItemSelect(item.id, item.path);
-    }
-    if (item.path) {
-      router.push(item.path);
-    }
-  };
+  const footerLinks = [
+    { id: "library", label: "Library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "explorer", label: "Explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "compare", label: "Compare", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "dashboard", label: "Dashboard", icon: <DashboardOutlinedIcon sx={{ fontSize: 18 }} /> },
+  ];
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: 240,
+        width: 270,
         flexShrink: 0,
         "& .MuiDrawer-paper": {
-          width: 240,
+          width: 270,
           boxSizing: "border-box",
-          backgroundColor: "white",
-          borderRight: "none",
+          backgroundColor: "hsl(var(--surface))",
           boxShadow: "none",
         },
       }}
@@ -96,16 +77,110 @@ export function Sidebar({
             background: "transparent",
           },
           "&::-webkit-scrollbar-thumb": {
-            background: "#d1d5db",
-            borderRadius: "3px",
+            background: "hsl(var(--border-soft))",
+            borderRadius: "4px",
           },
           "&::-webkit-scrollbar-thumb:hover": {
-            background: "#9ca3af",
+            background: "hsl(var(--text-muted))",
           },
         }}
       >
-        {/* Queries Section */}
+        {/* Sidebar sections */}
         <SidebarActions />
+      </Box>
+
+      <Box sx={{ px: 2, py: 1.5, borderTop: "1px solid hsl(var(--border-soft))" }}>
+        <Box
+          component="button"
+          type="button"
+          sx={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1,
+            py: 0.9,
+            borderRadius: 2,
+            color: "hsl(var(--text-primary))",
+            border: "none",
+            background: "transparent",
+            textAlign: "left",
+            transition: "background-color 160ms ease",
+            "&:hover": { backgroundColor: "hsl(var(--surface-muted))" },
+            "&:focus-visible": {
+              outline: "2px solid hsl(var(--ring))",
+              outlineOffset: "2px",
+            },
+          }}
+        >
+          <SettingsOutlinedIcon sx={{ fontSize: 18 }} />
+          <Typography sx={{ fontSize: "0.9rem", fontWeight: 500 }}>Settings</Typography>
+        </Box>
+
+        <Box sx={{ mt: 0.5 }}>
+          {footerLinks.map((item) => (
+            <Box
+              key={item.id}
+              component="button"
+              type="button"
+              sx={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1,
+                py: 0.8,
+                borderRadius: 2,
+                color: "hsl(var(--text-primary))",
+                border: "none",
+                background: "transparent",
+                textAlign: "left",
+                transition: "background-color 160ms ease",
+                "&:hover": { backgroundColor: "hsl(var(--surface-muted))" },
+                "&:focus-visible": {
+                  outline: "2px solid hsl(var(--ring))",
+                  outlineOffset: "2px",
+                },
+              }}
+            >
+              {item.icon}
+              <Typography sx={{ fontSize: "0.88rem" }}>{item.label}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          px: 2,
+          py: 1.2,
+          borderTop: "1px solid hsl(var(--border-soft))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              backgroundColor: "hsl(var(--surface-muted))",
+              display: "grid",
+              placeItems: "center",
+              fontSize: "0.74rem",
+              fontWeight: 700,
+              color: "hsl(var(--text-primary))",
+            }}
+          >
+            {(user.name || "U").slice(0, 1).toUpperCase()}
+          </Box>
+          <Typography sx={{ fontSize: "0.86rem", maxWidth: 150 }} noWrap>
+            {user.name}
+          </Typography>
+        </Box>
       </Box>
     </Drawer>
   );

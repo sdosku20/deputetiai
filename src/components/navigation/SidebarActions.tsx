@@ -1,14 +1,18 @@
 "use client";
 
 import {
+  Button,
+  Box,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  Box,
+  TextField,
   Typography,
 } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
+import AddIcon from "@mui/icons-material/Add";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import SearchIcon from "@mui/icons-material/Search";
 import DeleteOutline from "@mui/icons-material/DeleteOutline";
 import { useRouter } from "next/navigation";
 import { useConversationSessions } from "@/hooks/useConversationSessions";
@@ -86,82 +90,123 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
     );
   }
 
-  // Default: Show New Query button and Queries section with clean design
+  const historyItems = sessions.slice(0, 8);
+
+  // Default: Screenshot-inspired shell structure
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 0, px: 0 }}>
-      {/* New Query Section */}
-      <Box sx={{ px: 3, mt: 1 }}>
-        {/* ChatGPT-style New Query button with pencil-in-square icon */}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, px: 0, pb: 2 }}>
+      <Box sx={{ px: 2.5 }}>
         <Box
           onClick={handleNewQuery}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleNewQuery();
+            }
+          }}
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: "2px",
-            px: 0,
-            py: 1,
-            borderRadius: 1.5,
+            gap: 1,
+            px: 1,
+            py: 1.25,
+            borderRadius: 2,
             cursor: "pointer",
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "14px",
+            fontSize: "0.88rem",
             fontWeight: 600,
-            color: "#111827",
-            mb: 1,
-            backgroundColor: "#ffffff",
-            transition: "background-color 120ms ease",
+            color: "hsl(var(--text-primary))",
+            transition: "all 160ms ease",
+            "&:hover": {
+              backgroundColor: "hsl(var(--surface-muted))",
+            },
+            "&:focus-visible": {
+              outline: "2px solid hsl(var(--ring))",
+              outlineOffset: "2px",
+            },
           }}
         >
-          <Box
-            sx={{
-              width: 20,
-              height: 20,
-              borderRadius: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            <Box
-              component="img"
-              src="https://img.icons8.com/forma-regular/50/create-new.png"
-              alt="create-new"
-              sx={{ width: 16, height: 16, display: "block" }}
-            />
-          </Box>
+          <AddIcon sx={{ fontSize: 18 }} />
           Bëni një pyetje të re
         </Box>
       </Box>
 
-      {/* Queries Section Header */}
-      <SidebarSectionHeader title="Bisedat e mëparshme" />
+      <SidebarSectionHeader title="Projects" />
+      <Box sx={{ px: 2.5 }}>
+        <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))", px: 1 }}>
+          No projects yet
+        </Typography>
+      </Box>
 
-      {/* Conversations Section - Clean Design */}
-      <Box sx={{ px: 3, mt: 0.25 }}>
-        {/* Past Conversations List - ChatGPT-style, no inner scrollbar (outer sidebar scrolls) */}
-        {sessions.length > 0 ? (
-          <List dense sx={{ mb: 0.75, pl: 0 }}>
-            {sessions.map((session, index) => (
-              <ListItem key={`session-${session.session_id}-${index}`} disablePadding sx={{ mb: 0.125 }}>
+      <SidebarSectionHeader title="Bookmarks" />
+      <Box sx={{ px: 2.5 }} />
+
+      <SidebarSectionHeader title="Legal Alerts" />
+      <Box sx={{ px: 2.5 }}>
+        <Button fullWidth variant="outlined" startIcon={<AddIcon />} sx={{ justifyContent: "center", color: "hsl(var(--text-muted))" }}>
+          New Alert
+        </Button>
+      </Box>
+
+      <SidebarSectionHeader title="Saved Searches" />
+      <Box sx={{ px: 2.5 }}>
+        <Button fullWidth variant="outlined" startIcon={<AddIcon />} sx={{ justifyContent: "center", color: "hsl(var(--text-muted))" }}>
+          Save Search
+        </Button>
+      </Box>
+
+      <Box sx={{ px: 2.5, pt: 0.5 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search..."
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon sx={{ fontSize: 16, color: "hsl(var(--text-muted))", mr: 0.75 }} />,
+            },
+          }}
+          sx={{
+            "& .MuiInputBase-root": {
+              height: 36,
+              bgcolor: "hsl(var(--surface))",
+            },
+            "& .MuiInputBase-input": {
+              fontSize: "0.86rem",
+            },
+          }}
+        />
+      </Box>
+
+      <Box sx={{ display: "flex", alignItems: "center", px: 2.5, pt: 1, pb: 0.5 }}>
+        <SidebarSectionHeader title="History" />
+        <KeyboardArrowDownIcon sx={{ ml: "auto", mr: 0.6, color: "hsl(var(--text-muted))", fontSize: 18 }} />
+      </Box>
+
+      <Box sx={{ px: 2.5, mt: -0.5 }}>
+        {historyItems.length > 0 ? (
+          <List dense sx={{ mb: 0.75, pl: 0, pt: 0 }}>
+            {historyItems.map((session, index) => (
+              <ListItem key={`session-${session.session_id}-${index}`} disablePadding sx={{ mb: 0.35 }}>
                 <Box
                   sx={{
                     width: "100%",
                     display: "flex",
                     alignItems: "center",
                     gap: 0.5,
-                    "& .delete-btn": { opacity: 0, transition: "opacity 120ms ease" },
+                    "& .delete-btn": { opacity: 0, transition: "opacity 140ms ease" },
                     "&:hover .delete-btn": { opacity: 1 },
                   }}
                 >
                   <ListItemButton
                     onClick={() => handleSessionClick(session.session_id)}
                     sx={{
-                      px: 0,
-                      py: 0.25,
-                      borderRadius: 1.5,
+                      px: 0.75,
+                      py: 0.55,
+                      borderRadius: 2,
                       flex: 1,
                       "&:hover": {
-                        backgroundColor: "#f9f8f6",
+                        backgroundColor: "hsl(var(--surface-muted))",
                       },
                     }}
                   >
@@ -170,10 +215,9 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                       slotProps={{
                         primary: {
                           sx: {
-                            fontSize: "14px",
+                            fontSize: "0.86rem",
                             fontWeight: 400,
-                            color: "#111827",
-                            fontFamily: "'Space Grotesk', sans-serif",
+                            color: "hsl(var(--text-primary))",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -189,12 +233,12 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      width: 24,
-                      height: 24,
+                      width: 26,
+                      height: 26,
                       borderRadius: 1,
                       cursor: "pointer",
-                      color: "#6b7280",
-                      "&:hover": { backgroundColor: "#f3f4f6", color: "#111827" },
+                      color: "hsl(var(--text-muted))",
+                      "&:hover": { backgroundColor: "hsl(var(--surface-muted))", color: "hsl(var(--text-primary))" },
                     }}
                     title="Delete conversation"
                     aria-label={`Delete conversation`}
@@ -207,8 +251,8 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
             ))}
           </List>
         ) : (
-          <Box sx={{ py: 2, textAlign: "center", color: "#9ca3af" }}>
-            <Typography sx={{ fontSize: "13px", fontFamily: "'Space Grotesk', sans-serif" }}>
+          <Box sx={{ py: 1.5, textAlign: "center", color: "hsl(var(--text-muted))" }}>
+            <Typography sx={{ fontSize: "0.82rem" }}>
               Ende nuk ka biseda
             </Typography>
           </Box>
