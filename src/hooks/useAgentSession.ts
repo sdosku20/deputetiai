@@ -5,6 +5,8 @@ export interface AgentMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  sources?: string[];
+  reasoningSteps?: string[];
 }
 
 export function useAgentSession(sessionId: string | null = null) {
@@ -141,6 +143,8 @@ export function useAgentSession(sessionId: string | null = null) {
             role: "assistant",
             content: response.response,
             timestamp: new Date().toISOString(),
+            sources: response.sources,
+            reasoningSteps: response.reasoningSteps,
           };
           setMessages((prev) => [...prev, assistantMsg]);
           

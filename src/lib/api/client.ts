@@ -207,7 +207,7 @@ class APIClient {
     if (!jwtToken) {
       console.log('[API Client] No JWT token found, attempting login...');
       try {
-        const loginResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        const loginResponse = await fetch(`/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -221,6 +221,7 @@ class APIClient {
           jwtToken = loginData.access_token || loginData.token || null;
           if (jwtToken) {
             localStorage.setItem('jwt_token', jwtToken);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
             console.log('[API Client] ✓ Login successful, JWT token obtained');
           } else {
             console.error('[API Client] ❌ Login response missing token:', loginData);
@@ -290,6 +291,8 @@ export interface ChatCompletionResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+  sources?: unknown;
+  metadata?: unknown;
 }
 
 // Simplified response for our chat interface
@@ -297,6 +300,8 @@ export interface ChatResponse {
   success: boolean;
   response: string;
   error?: string;
+  sources?: string[];
+  reasoningSteps?: string[];
 }
 
 // Session-based message storage (client-side only)
@@ -341,6 +346,61 @@ class ChatAPIClient {
 
   constructor(apiClient: APIClient) {
     this.apiClient = apiClient;
+  }
+
+  private extractSources(rawSources: unknown, content: string): string[] {
+    if (Array.isArray(rawSources)) {
+      return rawSources
+        .map((item) => {
+          if (typeof item === "string") return item.trim();
+          if (item && typeof item === "object") {
+            const record = item as Record<string, unknown>;
+            const label = record.label || record.title || record.reference || record.source || record.id;
+            if (typeof label === "string") return label.trim();
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .slice(0, 12);
+    }
+
+    const sourcesFromContent = content.match(/\*\*Sources:\*\*\s*([^\n]+)/i);
+    if (sourcesFromContent?.[1]) {
+      return sourcesFromContent[1]
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+    }
+
+    return [];
+  }
+
+  private extractReasoningSteps(rawMetadata: unknown): string[] {
+    if (!rawMetadata || typeof rawMetadata !== "object") return [];
+    const metadata = rawMetadata as Record<string, unknown>;
+    const candidates = ["thinking_steps", "reasoning_steps", "steps", "thoughts"];
+
+    for (const key of candidates) {
+      const value = metadata[key];
+      if (Array.isArray(value)) {
+        const steps = value
+          .map((step) => {
+            if (typeof step === "string") return step.trim();
+            if (step && typeof step === "object") {
+              const record = step as Record<string, unknown>;
+              const txt = record.text || record.content || record.summary || record.title;
+              return typeof txt === "string" ? txt.trim() : "";
+            }
+            return "";
+          })
+          .filter(Boolean)
+          .slice(0, 8);
+        if (steps.length > 0) return steps;
+      }
+    }
+
+    return [];
   }
 
   /**
@@ -439,6 +499,8 @@ class ChatAPIClient {
       const finalResponse = refId
         ? `${assistantMessage}\n\nref: ${refId}`
         : assistantMessage;
+      const sources = this.extractSources(response.sources, assistantMessage);
+      const reasoningSteps = this.extractReasoningSteps(response.metadata);
       console.log('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
 
       // Store conversation in localStorage for session management
@@ -458,6 +520,8 @@ class ChatAPIClient {
       return {
         success: true,
         response: finalResponse,
+        sources,
+        reasoningSteps,
       };
     } catch (error: any) {
       // Better error logging

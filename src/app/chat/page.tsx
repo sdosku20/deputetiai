@@ -62,9 +62,16 @@ function ChatPageContent() {
         id: idx + 1,
         text: msg.content,
         fromUser: msg.role === "user",
+        sources: msg.sources || [],
+        reasoningSteps: msg.reasoningSteps || [],
       })),
     [agentMessages]
   );
+
+  const latestAssistantMessageId = useMemo(() => {
+    const assistantMessages = displayMessages.filter((msg) => !msg.fromUser);
+    return assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1].id : null;
+  }, [displayMessages]);
 
   // Build navigation items (reserved for future app sections)
   const navigationItems = useMemo<NavigationItem[]>(() => [], []);
@@ -276,7 +283,8 @@ function ChatPageContent() {
                 {displayMessages.length === 0 ? (
                   <PromptSuggestionGrid onPromptClick={handleSuggestionClick} />
                 ) : (
-                  displayMessages.map((msg) => {
+                  <>
+                    {displayMessages.map((msg) => {
                     const parsed = msg.fromUser ? null : parseResponse(msg.text);
                     return (
                       <MessageBubble
@@ -290,10 +298,37 @@ function ChatPageContent() {
                         isExpanded={expandedMessages.has(msg.id)}
                         isAlbanian={parsed?.isAlbanian || false}
                         refId={parsed?.refId || null}
+                        sources={msg.sources}
+                        reasoningSteps={msg.reasoningSteps}
+                        animateTyping={!msg.fromUser && latestAssistantMessageId === msg.id}
                         onToggleExpand={toggleExpandedMessage}
                       />
                     );
-                  })
+                  })}
+                    {loading && (
+                      <Box sx={{ color: "hsl(var(--text-muted))", width: "100%", maxWidth: 780 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography sx={{ fontSize: "0.9rem" }}>Generating answer...</Typography>
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 8,
+                              height: 16,
+                              bgcolor: "hsl(var(--primary))",
+                              animation: "blinkCursor 1s steps(2, start) infinite",
+                              "@keyframes blinkCursor": {
+                                "0%, 50%": { opacity: 1 },
+                                "50.01%, 100%": { opacity: 0 },
+                              },
+                            }}
+                          />
+                        </Box>
+                        <Typography sx={{ fontSize: "0.8rem", mt: 0.35 }}>
+                          Retrieving legal sources and reasoning steps...
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
                 )}
                 <div ref={messagesEndRef} />
               </Box>

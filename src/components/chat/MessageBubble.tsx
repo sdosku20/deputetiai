@@ -5,6 +5,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useEffect, useRef, useState } from "react";
 
 interface MessageBubbleProps {
   id: number;
@@ -16,6 +17,9 @@ interface MessageBubbleProps {
   isExpanded: boolean;
   isAlbanian: boolean;
   refId: string | null;
+  sources?: string[];
+  reasoningSteps?: string[];
+  animateTyping?: boolean;
   onToggleExpand: (id: number) => void;
 }
 
@@ -29,8 +33,41 @@ export function MessageBubble({
   isExpanded,
   isAlbanian,
   refId,
+  sources = [],
+  reasoningSteps = [],
+  animateTyping = false,
   onToggleExpand,
 }: MessageBubbleProps) {
+  const [typedText, setTypedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const animatedOnceRef = useRef(false);
+
+  useEffect(() => {
+    const fullText = isExpanded ? fullContent : visiblePart;
+    if (!animateTyping || animatedOnceRef.current) {
+      setTypedText(fullText);
+      return;
+    }
+
+    animatedOnceRef.current = true;
+    setIsTyping(true);
+    setTypedText("");
+    let i = 0;
+    const interval = setInterval(() => {
+      i += 3;
+      if (i >= fullText.length) {
+        setTypedText(fullText);
+        setIsTyping(false);
+        clearInterval(interval);
+        return;
+      }
+      setTypedText(fullText.slice(0, i));
+    }, 14);
+
+    return () => clearInterval(interval);
+  }, [animateTyping, fullContent, isExpanded, visiblePart]);
+
   if (isUserMessage) {
     return (
       <Box
@@ -77,7 +114,7 @@ export function MessageBubble({
           ),
         }}
       >
-        {isExpanded ? fullContent : visiblePart}
+        {typedText}
       </ReactMarkdown>
 
       {hasMore && (
@@ -106,6 +143,100 @@ export function MessageBubble({
         <Typography sx={{ mt: 1, fontSize: "0.65rem", color: "hsl(var(--text-muted))", fontFamily: "var(--font-geist-mono), monospace" }}>
           ref: {refId}
         </Typography>
+      )}
+
+      {sources.length > 0 && (
+        <Box sx={{ mt: 1.4 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+            <Typography
+              sx={{
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color: "hsl(var(--text-muted))",
+                fontWeight: 600,
+              }}
+            >
+              Sources:
+            </Typography>
+            {sources.slice(0, 6).map((source, idx) => (
+              <Box
+                key={`${source}-${idx}`}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.8,
+                  borderRadius: 999,
+                  border: "1px solid hsl(var(--border-soft))",
+                  backgroundColor: "hsl(var(--surface-muted))",
+                  px: 0.55,
+                  py: 0.35,
+                }}
+              >
+                <Box
+                  sx={{
+                    minWidth: 28,
+                    height: 20,
+                    borderRadius: 1.2,
+                    px: 0.55,
+                    display: "grid",
+                    placeItems: "center",
+                    backgroundColor: "#0d47a1",
+                    color: "#ffffff",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    lineHeight: 1,
+                  }}
+                >
+                  EU
+                </Box>
+                <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-primary))", lineHeight: 1 }}>
+                  {source}
+                </Typography>
+              </Box>
+            ))}
+            {sources.length > 6 && (
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: 999,
+                  border: "1px solid hsl(var(--border-soft))",
+                  backgroundColor: "hsl(var(--surface-muted))",
+                  px: 1.1,
+                  py: 0.45,
+                }}
+              >
+                <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))", lineHeight: 1 }}>
+                  +{sources.length - 6} more
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {reasoningSteps.length > 0 && (
+        <Box sx={{ mt: 1.4 }}>
+          <Button
+            size="small"
+            onClick={() => setShowReasoning((prev) => !prev)}
+            startIcon={showReasoning ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            sx={{ px: 0, color: "hsl(var(--text-muted))", "&:hover": { bgcolor: "transparent", color: "hsl(var(--text-primary))" } }}
+          >
+            Thinking steps
+          </Button>
+          {showReasoning && (
+            <Box sx={{ mt: 0.6, pl: 0.3 }}>
+              {reasoningSteps.map((step, idx) => (
+                <Typography key={`${step}-${idx}`} sx={{ fontSize: "0.86rem", color: "hsl(var(--text-muted))", mb: 0.45 }}>
+                  {idx + 1}. {step}
+                </Typography>
+              ))}
+            </Box>
+          )}
+        </Box>
       )}
     </Box>
   );

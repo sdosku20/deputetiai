@@ -20,6 +20,8 @@ type UpstreamChatResponse = {
   created?: number;
   choices?: unknown;
   usage?: unknown;
+  sources?: unknown;
+  metadata?: unknown;
 };
 
 function getBackendBaseUrl(): string {
@@ -132,6 +134,8 @@ export async function POST(request: NextRequest) {
           created: parsed.created,
           choices: parsed.choices,
           usage: parsed.usage,
+          sources: parsed.sources,
+          metadata: parsed.metadata,
         };
         return NextResponse.json(safeResponse, { status: upstreamResponse.status });
       } catch {
