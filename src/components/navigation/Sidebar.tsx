@@ -57,6 +57,7 @@ export function Sidebar({
           boxSizing: "border-box",
           backgroundColor: "hsl(var(--surface))",
           boxShadow: "none",
+          borderRadius: 0,
         },
       }}
       className={className}

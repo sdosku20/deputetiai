@@ -15,7 +15,6 @@ export function SidebarSectionHeader({ title }: SidebarSectionHeaderProps) {
         textTransform: "uppercase",
         letterSpacing: "0.08em",
         color: "hsl(var(--text-muted))",
-        px: 2.5,
         py: 0.5,
         lineHeight: 1.2,
       }}

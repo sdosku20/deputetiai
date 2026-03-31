@@ -15,6 +15,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteOutline from "@mui/icons-material/DeleteOutline";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useConversationSessions } from "@/hooks/useConversationSessions";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 
@@ -25,6 +26,13 @@ interface SidebarActionsProps {
 export function SidebarActions({ actions }: SidebarActionsProps) {
   const router = useRouter();
   const { sessions, deleteSession } = useConversationSessions();
+  const [openSections, setOpenSections] = useState({
+    projects: true,
+    bookmarks: true,
+    alerts: true,
+    saved: true,
+    history: true,
+  });
 
   // Handle new query - go to chat page with no session ID (fresh start)
   const handleNewQuery = () => {
@@ -92,6 +100,10 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
 
   const historyItems = sessions.slice(0, 8);
 
+  const toggleSection = (key: keyof typeof openSections) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Default: Screenshot-inspired shell structure
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, px: 0, pb: 2 }}>
@@ -132,28 +144,137 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         </Box>
       </Box>
 
-      <SidebarSectionHeader title="Projects" />
       <Box sx={{ px: 2.5 }}>
-        <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))", px: 1 }}>
-          No projects yet
-        </Typography>
+        <Box
+          onClick={() => toggleSection("projects")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("projects");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Projects" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.projects ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.projects && (
+          <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))", px: 1.4, pt: 0.2 }}>
+            No projects yet
+          </Typography>
+        )}
       </Box>
 
-      <SidebarSectionHeader title="Bookmarks" />
-      <Box sx={{ px: 2.5 }} />
-
-      <SidebarSectionHeader title="Legal Alerts" />
       <Box sx={{ px: 2.5 }}>
-        <Button fullWidth variant="outlined" startIcon={<AddIcon />} sx={{ justifyContent: "center", color: "hsl(var(--text-muted))" }}>
-          New Alert
-        </Button>
+        <Box
+          onClick={() => toggleSection("bookmarks")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("bookmarks");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Bookmarks" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.bookmarks ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
       </Box>
 
-      <SidebarSectionHeader title="Saved Searches" />
       <Box sx={{ px: 2.5 }}>
-        <Button fullWidth variant="outlined" startIcon={<AddIcon />} sx={{ justifyContent: "center", color: "hsl(var(--text-muted))" }}>
-          Save Search
-        </Button>
+        <Box
+          onClick={() => toggleSection("alerts")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("alerts");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Legal Alerts" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.alerts ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.alerts && (
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<AddIcon />}
+            sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
+          >
+            New Alert
+          </Button>
+        )}
+      </Box>
+
+      <Box sx={{ px: 2.5 }}>
+        <Box
+          onClick={() => toggleSection("saved")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("saved");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Saved Searches" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.saved ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.saved && (
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<AddIcon />}
+            sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
+          >
+            Save Search
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ px: 2.5, pt: 0.5 }}>
@@ -178,13 +299,35 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         />
       </Box>
 
-      <Box sx={{ display: "flex", alignItems: "center", px: 2.5, pt: 1, pb: 0.5 }}>
-        <SidebarSectionHeader title="History" />
-        <KeyboardArrowDownIcon sx={{ ml: "auto", mr: 0.6, color: "hsl(var(--text-muted))", fontSize: 18 }} />
+      <Box sx={{ display: "flex", alignItems: "center", px: 2.5, pt: 0.8, pb: 0.4 }}>
+        <Box
+          onClick={() => toggleSection("history")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("history");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", width: "100%", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="History" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.history ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
       </Box>
 
       <Box sx={{ px: 2.5, mt: -0.5 }}>
-        {historyItems.length > 0 ? (
+        {openSections.history && historyItems.length > 0 ? (
           <List dense sx={{ mb: 0.75, pl: 0, pt: 0 }}>
             {historyItems.map((session, index) => (
               <ListItem key={`session-${session.session_id}-${index}`} disablePadding sx={{ mb: 0.35 }}>
@@ -250,13 +393,13 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
               </ListItem>
             ))}
           </List>
-        ) : (
+        ) : openSections.history ? (
           <Box sx={{ py: 1.5, textAlign: "center", color: "hsl(var(--text-muted))" }}>
             <Typography sx={{ fontSize: "0.82rem" }}>
               Ende nuk ka biseda
             </Typography>
           </Box>
-        )}
+        ) : null}
       </Box>
     </Box>
   );
