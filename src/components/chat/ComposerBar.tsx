@@ -46,10 +46,6 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown }
               px: 1,
               fontSize: "0.94rem",
             },
-            "& .MuiInputBase-root.Mui-focused": {
-              boxShadow: "inset 0 0 0 2px hsl(var(--ring) / 0.18)",
-              borderRadius: 2,
-            },
           }}
         />
         <IconButton

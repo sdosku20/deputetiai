@@ -31,7 +31,19 @@ export function PromptSuggestionGrid({ onPromptClick }: PromptSuggestionGridProp
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.4 }}>
         {PROMPT_GROUPS.map((group) => (
-          <Paper key={group.title} sx={{ p: 1.2, borderRadius: 2.5, bgcolor: "hsl(var(--surface-muted))" }}>
+          <Paper
+            key={group.title}
+            sx={{
+              px: 1.3,
+              pt: 1.45,
+              pb: 1.2,
+              minHeight: 222,
+              borderRadius: 1.5,
+              bgcolor: "hsl(var(--surface-muted))",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <Typography
               sx={{
                 fontSize: "0.66rem",
@@ -39,7 +51,10 @@ export function PromptSuggestionGrid({ onPromptClick }: PromptSuggestionGridProp
                 letterSpacing: "0.09em",
                 color: "hsl(var(--text-muted))",
                 fontWeight: 700,
-                mb: 0.9,
+                pl: 1,
+                pt: 0.5,
+                mb: 1.05,
+                lineHeight: 1.2,
               }}
             >
               {group.title}

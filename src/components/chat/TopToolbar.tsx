@@ -7,21 +7,28 @@ import AppsIcon from "@mui/icons-material/Apps";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 
 export function TopToolbar() {
+  const toolbarItems = [
+    { id: "chat", icon: <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />, isSelected: true },
+    { id: "search", icon: <SearchIcon sx={{ fontSize: 18 }} />, isSelected: false },
+    { id: "apps", icon: <AppsIcon sx={{ fontSize: 18 }} />, isSelected: false },
+    { id: "more", icon: <MoreVertIcon sx={{ fontSize: 18 }} />, isSelected: false },
+  ];
+
   return (
     <Box sx={{ display: "flex", justifyContent: "center", mb: 1.2 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        {[<ChatBubbleOutlineIcon key="chat" sx={{ fontSize: 18 }} />, <SearchIcon key="search" sx={{ fontSize: 18 }} />, <AppsIcon key="apps" sx={{ fontSize: 18 }} />, <MoreVertIcon key="more" sx={{ fontSize: 18 }} />].map((icon, idx) => (
+        {toolbarItems.map((item) => (
           <IconButton
-            key={idx}
+            key={item.id}
             size="small"
             sx={{
               border: "1px solid hsl(var(--border-soft))",
-              bgcolor: "hsl(var(--surface))",
-              color: "hsl(var(--text-muted))",
+              bgcolor: item.isSelected ? "hsl(var(--primary))" : "hsl(var(--surface))",
+              color: item.isSelected ? "hsl(var(--primary-foreground))" : "hsl(var(--text-muted))",
               transition: "all 140ms ease",
               "&:hover": {
-                color: "hsl(var(--text-primary))",
-                backgroundColor: "hsl(var(--surface-muted))",
+                color: item.isSelected ? "hsl(var(--primary-foreground))" : "hsl(var(--text-primary))",
+                backgroundColor: item.isSelected ? "hsl(var(--primary))" : "hsl(var(--surface-muted))",
                 transform: "translateY(-1px)",
               },
               "&:focus-visible": {
@@ -30,7 +37,7 @@ export function TopToolbar() {
               },
             }}
           >
-            {icon}
+            {item.icon}
           </IconButton>
         ))}
       </Box>

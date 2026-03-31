@@ -140,7 +140,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
         >
           <AddIcon sx={{ fontSize: 18 }} />
-          Bëni një pyetje të re
+          Ask a new question
         </Box>
       </Box>
 
@@ -394,9 +394,9 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
             ))}
           </List>
         ) : openSections.history ? (
-          <Box sx={{ py: 1.5, textAlign: "center", color: "hsl(var(--text-muted))" }}>
+          <Box sx={{ color: "hsl(var(--text-muted))", px: 1.4 }}>
             <Typography sx={{ fontSize: "0.82rem" }}>
-              Ende nuk ka biseda
+              No conversations yet
             </Typography>
           </Box>
         ) : null}
