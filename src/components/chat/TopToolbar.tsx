@@ -3,7 +3,6 @@
 import { Box, IconButton } from "@mui/material";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import SearchIcon from "@mui/icons-material/Search";
-import AppsIcon from "@mui/icons-material/Apps";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useRouter } from "next/navigation";
 
@@ -13,8 +12,6 @@ export function TopToolbar() {
   const toolbarItems = [
     { id: "chat", icon: <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />, isSelected: true },
     { id: "search", icon: <SearchIcon sx={{ fontSize: 18 }} />, isSelected: false },
-    { id: "apps", icon: <AppsIcon sx={{ fontSize: 18 }} />, isSelected: false },
-    { id: "more", icon: <MoreVertIcon sx={{ fontSize: 18 }} />, isSelected: false },
   ];
 
   return (

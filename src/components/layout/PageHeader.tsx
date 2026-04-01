@@ -1,11 +1,14 @@
+"use client";
+
 import { Breadcrumb } from "@/components/navigation/Breadcrumb";
-import SearchIcon from "@mui/icons-material/Search";
-import TuneIcon from "@mui/icons-material/Tune";
+import CheckIcon from "@mui/icons-material/Check";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
-import InputBase from "@mui/material/InputBase";
-import Switch from "@mui/material/Switch";
+import Button from "@mui/material/Button";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import Typography from "@mui/material/Typography";
+import { useEffect, useState } from "react";
 
 interface PageHeaderProps {
   breadcrumbItems: Array<{
@@ -21,9 +24,28 @@ interface PageHeaderProps {
   onLogout?: () => void;
 }
 
+const LAW_OPTIONS = [
+  { id: "eu_law", label: "EU Law" },
+  { id: "albanian", label: "Albanian Law" },
+] as const;
+
+const LAW_STORAGE_KEY = "selected_law";
+
 export function PageHeader({
   breadcrumbItems,
 }: PageHeaderProps) {
+  const [selectedLaw, setSelectedLaw] = useState<(typeof LAW_OPTIONS)[number]["id"]>("eu_law");
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+
+  const selectedLawLabel = LAW_OPTIONS.find((option) => option.id === selectedLaw)?.label || "EU Law";
+
+  useEffect(() => {
+    const storedLaw = typeof window !== "undefined" ? window.localStorage.getItem(LAW_STORAGE_KEY) : null;
+    if (storedLaw === "eu_law" || storedLaw === "albanian") {
+      setSelectedLaw(storedLaw);
+    }
+  }, []);
+
   return (
     <Box
       sx={{
@@ -39,62 +61,56 @@ export function PageHeader({
         <Breadcrumb items={breadcrumbItems} />
       </Box>
 
-      <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 1 }}>
-        <Box
+      <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" }}>
+        <Button
+          onClick={(event) => setMenuAnchor(event.currentTarget)}
+          endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18 }} />}
           sx={{
-            display: "flex",
-            alignItems: "center",
+            borderRadius: 999,
+            px: 1.4,
+            py: 0.55,
             border: "1px solid hsl(var(--border-soft))",
-            borderRadius: 8,
-            px: 1,
-            py: 0.3,
-            backgroundColor: "hsl(var(--surface))",
-          }}
-        >
-          <SearchIcon sx={{ fontSize: 18, color: "hsl(var(--text-muted))", mr: 0.5 }} />
-          <InputBase
-            placeholder="Search"
-            sx={{
-              width: 120,
-              fontSize: "0.82rem",
-              "& input::placeholder": { opacity: 1, color: "hsl(var(--text-muted))" },
-            }}
-          />
-        </Box>
-        <Box
-          sx={{
-            border: "1px solid hsl(var(--border-soft))",
-            borderRadius: 8,
-            px: 1.1,
-            py: 0.65,
-            fontSize: "0.82rem",
+            bgcolor: "hsl(var(--surface))",
             color: "hsl(var(--text-primary))",
-            backgroundColor: "hsl(var(--surface))",
+            textTransform: "none",
+            fontSize: "0.9rem",
+            fontWeight: 500,
           }}
         >
-          EU Law
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Switch size="small" />
-          <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))" }}>Historical</Typography>
-        </Box>
-        <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))" }}>Share:</Typography>
-        <Box
-          sx={{
-            border: "1px solid hsl(var(--border-soft))",
-            borderRadius: 8,
-            px: 1.1,
-            py: 0.65,
-            fontSize: "0.82rem",
-            color: "hsl(var(--text-primary))",
-            backgroundColor: "hsl(var(--surface))",
+          {selectedLawLabel}
+        </Button>
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={() => setMenuAnchor(null)}
+          PaperProps={{
+            sx: {
+              mt: 0.6,
+              minWidth: 210,
+              borderRadius: 2.2,
+              border: "1px solid hsl(var(--border-soft))",
+              bgcolor: "hsl(var(--surface))",
+            },
           }}
         >
-          Private
-        </Box>
-        <IconButton size="small">
-          <TuneIcon sx={{ fontSize: 18 }} />
-        </IconButton>
+          {LAW_OPTIONS.map((option) => (
+            <MenuItem
+              key={option.id}
+              onClick={() => {
+                setSelectedLaw(option.id);
+                if (typeof window !== "undefined") {
+                  window.localStorage.setItem(LAW_STORAGE_KEY, option.id);
+                  window.dispatchEvent(new CustomEvent("selectedLawUpdated", { detail: { value: option.id } }));
+                }
+                setMenuAnchor(null);
+              }}
+              sx={{ minHeight: 38, gap: 1 }}
+            >
+              {selectedLaw === option.id ? <CheckIcon sx={{ fontSize: 18 }} /> : <Box sx={{ width: 18, height: 18 }} />}
+              <Typography sx={{ fontSize: "0.95rem", color: "hsl(var(--text-primary))" }}>{option.label}</Typography>
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
     </Box>
   );

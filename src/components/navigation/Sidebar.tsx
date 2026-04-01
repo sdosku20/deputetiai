@@ -7,7 +7,6 @@ import Typography from "@mui/material/Typography";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
 import CompareArrowsOutlinedIcon from "@mui/icons-material/CompareArrowsOutlined";
-import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import { usePathname, useRouter } from "next/navigation";
 import type { NavigationItem } from "@/types/dashboard";
 import { SidebarLogo } from "./SidebarLogo";
@@ -45,7 +44,6 @@ export function Sidebar({
     { id: "library", label: "Library", path: "/library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
     { id: "explorer", label: "Explorer", path: "/explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
     { id: "compare", label: "Compare", path: "", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { id: "dashboard", label: "Dashboard", path: "", icon: <DashboardOutlinedIcon sx={{ fontSize: 18 }} /> },
   ];
 
   return (

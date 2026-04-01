@@ -15,7 +15,7 @@ import SendIcon from "@mui/icons-material/Send";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import type { KeyboardEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface ComposerBarProps {
   loading: boolean;
@@ -23,6 +23,7 @@ interface ComposerBarProps {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
+  focusInputSignal?: number;
 }
 
 interface ProfileOption {
@@ -39,15 +40,21 @@ const PROFILE_OPTIONS: ProfileOption[] = [
   { id: "compliance", label: "Compliance", description: "Practical guidance" },
 ];
 
-export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown }: ComposerBarProps) {
+export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, focusInputSignal = 0 }: ComposerBarProps) {
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedProfile, setSelectedProfile] = useState("general");
   const [smartEnabled, setSmartEnabled] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const activeProfile = useMemo(
     () => PROFILE_OPTIONS.find((option) => option.id === selectedProfile) || PROFILE_OPTIONS[0],
     [selectedProfile]
   );
+
+  useEffect(() => {
+    if (!focusInputSignal) return;
+    inputRef.current?.focus();
+  }, [focusInputSignal]);
 
   return (
     <Box sx={{ px: { xs: 1.4, sm: 2.5 }, py: { xs: 1.4, sm: 2 }, position: "sticky", bottom: 0, zIndex: 3 }}>
@@ -76,6 +83,7 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown }
           onKeyDown={onKeyDown}
           disabled={loading}
           placeholder="Ask about EU law..."
+          inputRef={inputRef}
           InputProps={{ disableUnderline: true }}
           sx={{
             "& .MuiInputBase-input": {
