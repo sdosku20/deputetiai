@@ -25,8 +25,8 @@ interface PageHeaderProps {
 }
 
 const LAW_OPTIONS = [
-  { id: "eu_law", label: "EU Law" },
-  { id: "albanian", label: "Albanian Law" },
+  { id: "eu_law", label: "Ligji i BE-se" },
+  { id: "albanian", label: "Ligji Shqiptar" },
 ] as const;
 
 const LAW_STORAGE_KEY = "selected_law";
@@ -37,7 +37,7 @@ export function PageHeader({
   const [selectedLaw, setSelectedLaw] = useState<(typeof LAW_OPTIONS)[number]["id"]>("eu_law");
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const selectedLawLabel = LAW_OPTIONS.find((option) => option.id === selectedLaw)?.label || "EU Law";
+  const selectedLawLabel = LAW_OPTIONS.find((option) => option.id === selectedLaw)?.label || "Ligji i BE-se";
 
   useEffect(() => {
     const storedLaw = typeof window !== "undefined" ? window.localStorage.getItem(LAW_STORAGE_KEY) : null;

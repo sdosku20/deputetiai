@@ -422,7 +422,7 @@ class ChatAPIClient {
     // Create new conversation
     try {
       const response = await this.apiClient.post<Conversation>('/api/v1/conversations', {
-        title: 'New conversation',
+        title: 'Bisede e re',
         profile: 'general',
       });
       console.log('[ChatAPI] Created new conversation:', response.id);
@@ -449,8 +449,11 @@ class ChatAPIClient {
 
       // Send an abstracted payload to the local proxy. The proxy builds the
       // backend OpenAI-compatible shape server-side.
+      const selectedLaw = typeof window !== 'undefined' ? localStorage.getItem('selected_law') : null;
+      const source = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
       const requestBody = {
         prompt: userMessage,
+        source,
       };
 
       // Log what we're actually sending
@@ -461,6 +464,7 @@ class ChatAPIClient {
       console.log('[ChatAPI] Request details:', {
         messageCount: messages.length,
         messagePreview: userMessage.substring(0, 80),
+        source,
       });
 
       // Step 4: Send request via local proxy to keep API key server-side
@@ -570,20 +574,20 @@ class ChatAPIClient {
       }
       
       // Build a production-safe user message (avoid leaking endpoint URLs/internal details)
-      let userErrorMessage = 'Something went wrong while processing your request. Please try again.';
+      let userErrorMessage = 'Ndodhi nje gabim gjate perpunimit te kerkeses. Ju lutem provoni perseri.';
 
       if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
-        userErrorMessage = 'Network issue detected. Please check your connection and try again.';
+        userErrorMessage = 'U zbulua problem me rrjetin. Ju lutem kontrolloni lidhjen dhe provoni perseri.';
       } else if (errorCode === 'ECONNABORTED') {
-        userErrorMessage = 'The request is taking longer than expected. Please try again.';
+        userErrorMessage = 'Kerkesa po zgjat me shume se sa pritej. Ju lutem provoni perseri.';
       } else if (errorStatus === 401 || errorStatus === 403) {
-        userErrorMessage = 'Authentication failed. Please sign in again.';
+        userErrorMessage = 'Autentikimi deshtoi. Ju lutem hyni perseri.';
       } else if (errorStatus === 429) {
-        userErrorMessage = 'Too many requests at the moment. Please wait a bit and try again.';
+        userErrorMessage = 'Ka shume kerkesa per momentin. Ju lutem prisni pak dhe provoni perseri.';
       } else if (typeof errorStatus === 'number' && errorStatus >= 500) {
-        userErrorMessage = 'The service is temporarily unavailable. Please try again in a moment.';
+        userErrorMessage = 'Sherbimi eshte perkohesisht i padisponueshem. Ju lutem provoni pas pak.';
       } else if (typeof errorStatus === 'number' && errorStatus >= 400) {
-        userErrorMessage = 'The request could not be completed. Please verify your input and try again.';
+        userErrorMessage = 'Kerkesa nuk mund te plotesohej. Ju lutem verifikoni inputin dhe provoni perseri.';
       }
       
       // If we got a 500 error with RAG pipeline error, show it clearly
@@ -695,7 +699,7 @@ class ChatAPIClient {
       
       const session: SessionMessages = JSON.parse(stored);
       const firstUserMessage = session.messages.find(m => m.role === 'user');
-      const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+      const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
       
       const sessionsJson = localStorage.getItem('chat_sessions_list');
       let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];

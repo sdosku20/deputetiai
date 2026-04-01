@@ -32,7 +32,7 @@ function ChatPageContent() {
   const [input, setInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
-  const [selectedLawLabel, setSelectedLawLabel] = useState("EU Law");
+  const [selectedLawLabel, setSelectedLawLabel] = useState("Ligji i BE-se");
   const [focusInputSignal, setFocusInputSignal] = useState(0);
 
   const router = useRouter();
@@ -89,7 +89,7 @@ function ChatPageContent() {
   }, [displayMessages]);
 
   useEffect(() => {
-    const mapLawToLabel = (value: string | null) => (value === "albanian" ? "Albanian Law" : "EU Law");
+    const mapLawToLabel = (value: string | null) => (value === "albanian" ? "Ligji Shqiptar" : "Ligji i BE-se");
     const storedLaw = typeof window !== "undefined" ? window.localStorage.getItem("selected_law") : null;
     setSelectedLawLabel(mapLawToLabel(storedLaw));
 
@@ -257,7 +257,7 @@ function ChatPageContent() {
       <Box component="main" sx={{ flexGrow: 1, minHeight: "100vh", width: isMobile ? "100%" : "auto" }}>
         <DashboardLayout
           header={
-            <PageHeader breadcrumbItems={[{ label: "Law Assistant" }]} user={userForHeader} onLogout={handleLogout} />
+            <PageHeader breadcrumbItems={[{ label: "Asistenti Ligjor" }]} user={userForHeader} onLogout={handleLogout} />
           }
         >
           {isMobile && (
@@ -325,7 +325,7 @@ function ChatPageContent() {
                     {loading && (
                       <Box sx={{ color: "hsl(var(--text-muted))", width: "100%", maxWidth: 780 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Typography sx={{ fontSize: "0.9rem" }}>Generating answer...</Typography>
+                          <Typography sx={{ fontSize: "0.9rem" }}>Po gjenerohet pergjigjja...</Typography>
                           <Box
                             component="span"
                             sx={{
@@ -341,7 +341,7 @@ function ChatPageContent() {
                           />
                         </Box>
                         <Typography sx={{ fontSize: "0.8rem", mt: 0.35 }}>
-                          Retrieving legal sources and reasoning steps...
+                          Po merren burimet ligjore dhe hapat e arsyetimit...
                         </Typography>
                       </Box>
                     )}
@@ -368,7 +368,7 @@ function ChatPageContent() {
                   </Typography>
                   {lastFailedUserMessage && (
                     <Button variant="text" size="small" onClick={handleRetryLast} disabled={loading}>
-                      Retry
+                      Provo perseri
                     </Button>
                   )}
                 </Box>

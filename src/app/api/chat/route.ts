@@ -8,11 +8,14 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const MAX_PROMPT_LENGTH = 6000;
 const DEFAULT_MODEL = process.env.CHAT_MODEL || process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
+const ALBANIAN_MODEL = process.env.CHAT_MODEL_ALBANIAN || process.env.NEXT_PUBLIC_CHAT_MODEL_ALBANIAN || DEFAULT_MODEL;
+const ALLOWED_SOURCES = new Set(['eu_law', 'albanian']);
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 type ChatProxyRequest = {
   prompt: string;
+  source?: string;
 };
 
 type UpstreamChatResponse = {
@@ -68,6 +71,12 @@ function sanitizePrompt(input: unknown): string | null {
   return normalized;
 }
 
+function normalizeSource(input: unknown): 'eu_law' | 'albanian' {
+  if (typeof input !== 'string') return 'eu_law';
+  const normalized = input.trim().toLowerCase();
+  return ALLOWED_SOURCES.has(normalized) ? (normalized as 'eu_law' | 'albanian') : 'eu_law';
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -95,6 +104,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as Partial<ChatProxyRequest>;
     const prompt = sanitizePrompt(body.prompt);
+    const source = normalizeSource(body.source);
     if (!prompt) {
       return NextResponse.json(
         { detail: 'Invalid request. Prompt is required.' },
@@ -103,7 +113,9 @@ export async function POST(request: NextRequest) {
     }
 
     const backendPayload = {
-      model: DEFAULT_MODEL,
+      model: source === 'albanian' ? ALBANIAN_MODEL : DEFAULT_MODEL,
+      source,
+      data_source: source,
       messages: [{ role: 'user', content: prompt }],
     };
 
@@ -147,6 +159,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Preserve status, but avoid passing full upstream internals.
+    console.warn('[chat-route] Upstream chat failed', {
+      status: upstreamResponse.status,
+      source,
+      responsePreview: responseText.slice(0, 300),
+    });
     return NextResponse.json(
       { detail: 'Service is temporarily unavailable. Please try again in a moment.' },
       { status: upstreamResponse.status }

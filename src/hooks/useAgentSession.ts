@@ -91,7 +91,7 @@ export function useAgentSession(sessionId: string | null = null) {
             const sessionsJson = localStorage.getItem('chat_sessions_list');
             let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
             const firstUserMessage = updatedHistoryWithUser.find(m => m.role === 'user');
-            const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+            const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
             
             // Remove existing session if present
             sessions = sessions.filter(s => s.session_id !== activeSessionId);
@@ -164,7 +164,7 @@ export function useAgentSession(sessionId: string | null = null) {
           });
           
           const errorContent = response?.error || 
-                              "I encountered an error processing your request. Please try again.";
+                              "Ndodhi nje gabim gjate perpunimit te kerkeses. Ju lutem provoni perseri.";
           
           const errorMsg: AgentMessage = {
             role: "assistant",
@@ -172,7 +172,7 @@ export function useAgentSession(sessionId: string | null = null) {
             timestamp: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, errorMsg]);
-          setError(response?.error || "Failed to get response from assistant");
+          setError(response?.error || "Deshtoi marrja e pergjigjes nga asistenti");
           setLastFailedUserMessage(userMessage);
           
           // Even on error, save the conversation (user message + error message)
@@ -192,7 +192,7 @@ export function useAgentSession(sessionId: string | null = null) {
               const sessionsJson = localStorage.getItem('chat_sessions_list');
               let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
               const firstUserMessage = historyWithError.find(m => m.role === 'user');
-              const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+              const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
               
               sessions = sessions.filter(s => s.session_id !== activeSessionId);
               sessions.unshift({
@@ -218,7 +218,7 @@ export function useAgentSession(sessionId: string | null = null) {
         
         const errorMsg: AgentMessage = {
           role: "assistant",
-          content: "Request failed. Please try again.",
+          content: "Kerkesa deshtoi. Ju lutem provoni perseri.",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
@@ -241,7 +241,7 @@ export function useAgentSession(sessionId: string | null = null) {
             const sessionsJson = localStorage.getItem('chat_sessions_list');
             let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
             const firstUserMessage = historyWithError.find(m => m.role === 'user');
-            const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
+            const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
             
             sessions = sessions.filter(s => s.session_id !== activeSessionId);
             sessions.unshift({

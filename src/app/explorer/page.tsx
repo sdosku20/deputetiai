@@ -47,8 +47,8 @@ interface ExplorerChunk {
 type ExplorerChunksPayload = { chunks?: Array<Partial<ExplorerChunk> & Record<string, unknown>> };
 
 const SOURCE_OPTIONS: Array<{ id: SourceKey; label: string }> = [
-  { id: "eu_law", label: "EU Law" },
-  { id: "albanian", label: "Albanian" },
+  { id: "eu_law", label: "Ligji i BE-se" },
+  { id: "albanian", label: "Ligji Shqiptar" },
 ];
 
 const DECADE_OPTIONS = ["All years", "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", "1950s"];
@@ -97,9 +97,9 @@ export default function ExplorerPage() {
         const payload = (await response.json()) as { results: Array<Record<string, unknown>>; total: number };
         const mapped = (payload.results || []).map((item) => ({
           id: String(item.document_id || item.id || ""),
-          title: String(item.title || "Untitled"),
+          title: String(item.title || "Pa titull"),
           subtitle: String(item.subtitle || item.text_preview || ""),
-          doc_type: String(item.doc_type || "Document"),
+          doc_type: String(item.doc_type || "Dokument"),
           date: "",
           in_force: false,
           chunk_count: 0,
@@ -255,14 +255,14 @@ export default function ExplorerPage() {
 
       <Box component="main" sx={{ flexGrow: 1, minHeight: "100vh" }}>
         <DashboardLayout
-          header={<PageHeader breadcrumbItems={[{ label: "Law Assistant" }]} user={userForHeader} onLogout={logout} />}
+          header={<PageHeader breadcrumbItems={[{ label: "Asistenti Ligjor" }]} user={userForHeader} onLogout={logout} />}
         >
           <Box sx={{ px: { xs: 1, sm: 2 }, pb: 1 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, mb: 1 }}>
               <Button startIcon={<ArrowBackIcon />} size="small" onClick={() => router.push("/chat")}>
-                Back to Chat
+                Kthehu te Chat
               </Button>
-              <Typography sx={{ fontSize: "1rem", fontWeight: 600 }}>Explorer</Typography>
+              <Typography sx={{ fontSize: "1rem", fontWeight: 600 }}>Eksploro</Typography>
             </Box>
 
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.65, mb: 1 }}>
@@ -307,7 +307,7 @@ export default function ExplorerPage() {
 
                 <TextField
                   size="small"
-                  placeholder={`Search ${total.toLocaleString()} documents...`}
+                  placeholder={`Kerko ne ${total.toLocaleString()} dokumente...`}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   slotProps={{
@@ -323,7 +323,7 @@ export default function ExplorerPage() {
                 />
 
                 <Typography sx={{ fontSize: "0.84rem", color: "hsl(var(--text-muted))", mb: 0.6 }}>
-                  {total.toLocaleString()} documents
+                  {total.toLocaleString()} dokumente
                 </Typography>
 
                 {loading ? (
@@ -360,12 +360,12 @@ export default function ExplorerPage() {
                     <Typography sx={{ fontSize: "1.1rem", fontWeight: 700, lineHeight: 1.25 }}>{selectedDoc.title}</Typography>
                     <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))", mt: 0.5 }}>{selectedDoc.id}</Typography>
                     <Box sx={{ mt: 1.2, display: "flex", gap: 0.6 }}>
-                      <Chip label="All Chapters" color="primary" size="small" />
-                      <Chip label={`Chapter recital (${selectedChunks.length})`} size="small" />
+                      <Chip label="Te gjitha kapitujt" color="primary" size="small" />
+                      <Chip label={`Recitale kapitulli (${selectedChunks.length})`} size="small" />
                     </Box>
                     <TextField
                       size="small"
-                      placeholder="Search articles..."
+                      placeholder="Kerko nenet..."
                       value={chunkQuery}
                       onChange={(e) => setChunkQuery(e.target.value)}
                       sx={{ mt: 1.1, mb: 1.1, width: "100%", maxWidth: 360 }}
@@ -387,9 +387,9 @@ export default function ExplorerPage() {
                               bgcolor: "hsl(var(--surface-muted))",
                             }}
                           >
-                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Article</Typography>
-                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Heading</Typography>
-                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Preview</Typography>
+                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Neni</Typography>
+                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Titulli</Typography>
+                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))" }}>Parapamje</Typography>
                           </Box>
                           <Box sx={{ maxHeight: 210, overflowY: "auto" }}>
                             {filteredChunks.map((chunk) => {
@@ -411,7 +411,7 @@ export default function ExplorerPage() {
                                   <Typography sx={{ fontSize: "0.82rem" }}>{chunk.article_label || chunk.group_label || "-"}</Typography>
                                   <Typography sx={{ fontSize: "0.82rem" }}>{chunk.article_title || chunk.group_title || "-"}</Typography>
                                   <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))" }} noWrap>
-                                    {chunk.text_preview || chunk.text || "No preview"}
+                                    {chunk.text_preview || chunk.text || "Nuk ka parapamje"}
                                   </Typography>
                                 </Box>
                               );
@@ -422,13 +422,13 @@ export default function ExplorerPage() {
                         {activeChunk ? (
                           <Paper sx={{ p: 1.1, borderRadius: 1.2 }}>
                             <Typography sx={{ fontSize: "1rem", fontWeight: 700, mb: 0.5 }}>
-                              {activeChunk.article_title || activeChunk.group_title || activeChunk.article_label || "Selected section"}
+                              {activeChunk.article_title || activeChunk.group_title || activeChunk.article_label || "Seksioni i zgjedhur"}
                             </Typography>
                             <Typography sx={{ fontSize: "0.76rem", color: "hsl(var(--text-muted))", mb: 0.6 }}>
                               {activeChunk.article_label || activeChunk.group_label || selectedDoc.id}
                             </Typography>
                             <Typography sx={{ fontSize: "0.86rem", color: "hsl(var(--text-primary))", lineHeight: 1.65 }}>
-                              {activeChunk.text || activeChunk.text_preview || "No text preview available."}
+                              {activeChunk.text || activeChunk.text_preview || "Nuk ka tekst parapamjeje."}
                             </Typography>
                             <Button
                               size="small"
@@ -442,7 +442,7 @@ export default function ExplorerPage() {
                                 )
                               }
                             >
-                              Copy
+                              Kopjo
                             </Button>
                           </Paper>
                         ) : null}
@@ -450,10 +450,10 @@ export default function ExplorerPage() {
                     ) : (
                       <>
                         <Typography sx={{ fontSize: "0.86rem", color: "hsl(var(--text-primary))", lineHeight: 1.65 }}>
-                          {(selectedDocDetail?.subtitle as string) || selectedDoc.subtitle || "No preview text available for this document."}
+                          {(selectedDocDetail?.subtitle as string) || selectedDoc.subtitle || "Nuk ka tekst parapamjeje per kete dokument."}
                         </Typography>
                         <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))", mt: 0.8 }}>
-                          This document currently has no indexed chunk previews in the selected source.
+                          Ky dokument aktualisht nuk ka parapamje te indeksuara ne burimin e zgjedhur.
                         </Typography>
                       </>
                     )}
@@ -461,7 +461,7 @@ export default function ExplorerPage() {
                 ) : (
                   <Box sx={{ minHeight: 220, display: "grid", placeItems: "center" }}>
                     <Typography sx={{ fontSize: "0.92rem", color: "hsl(var(--text-muted))" }}>
-                      Select a regulation to view its contents
+                      Zgjidh nje rregullore per te pare permbajtjen
                     </Typography>
                   </Box>
                 )}

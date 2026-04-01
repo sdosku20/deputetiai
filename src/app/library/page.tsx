@@ -36,8 +36,8 @@ interface LibraryResult {
 }
 
 const SOURCE_FILTERS: SourceFilter[] = [
-  { key: "eu_law", label: "EU Law" },
-  { key: "albanian", label: "Albanian" },
+  { key: "eu_law", label: "Ligji i BE-se" },
+  { key: "albanian", label: "Ligji Shqiptar" },
 ];
 
 export default function LibraryPage() {
@@ -86,9 +86,9 @@ export default function LibraryPage() {
           const mapped = (payload.results || []).map((item) => ({
             id: String(item.id || item.document_id || `${source}-${Math.random()}`),
             source,
-            title: String(item.title || "Untitled"),
+            title: String(item.title || "Pa titull"),
             subtitle: String(item.text_preview || item.subtitle || ""),
-            docType: String(item.doc_type || "Document"),
+            docType: String(item.doc_type || "Dokument"),
             date: "",
             score: typeof item.score === "number" ? Math.round(item.score) : undefined,
           }));
@@ -106,9 +106,9 @@ export default function LibraryPage() {
         const mapped = (payload.documents || []).map((item) => ({
           id: String(item.id || `${source}-${Math.random()}`),
           source,
-          title: String(item.title || "Untitled"),
+          title: String(item.title || "Pa titull"),
           subtitle: String(item.subtitle || ""),
-          docType: String(item.doc_type || "Document"),
+          docType: String(item.doc_type || "Dokument"),
           date: String(item.date || ""),
         }));
         return { total: payload.total || mapped.length, mapped };
@@ -162,7 +162,7 @@ export default function LibraryPage() {
 
       <Box component="main" sx={{ flexGrow: 1, minHeight: "100vh" }}>
         <DashboardLayout
-          header={<PageHeader breadcrumbItems={[{ label: "Library" }]} user={userForHeader} onLogout={logout} />}
+          header={<PageHeader breadcrumbItems={[{ label: "Biblioteka" }]} user={userForHeader} onLogout={logout} />}
         >
           <Box sx={{ px: { xs: 1, sm: 2 }, pb: 0 }}>
             <Box
@@ -182,7 +182,7 @@ export default function LibraryPage() {
               >
               <TextField
                 fullWidth
-                placeholder="Search across all legal databases..."
+                placeholder="Kerko ne te gjitha bazat ligjore..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 slotProps={{
@@ -222,7 +222,7 @@ export default function LibraryPage() {
                     mb: 0.8,
                   }}
                 >
-                  Sources
+                  Burimet
                 </Typography>
                 {SOURCE_FILTERS.map((filter) => (
                   <FormControlLabel
@@ -263,7 +263,7 @@ export default function LibraryPage() {
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                   <Typography sx={{ fontSize: "0.84rem", color: "hsl(var(--text-muted))" }}>
-                    {totalCount} results
+                    {totalCount} rezultate
                   </Typography>
                 </Box>
                 <Divider sx={{ mb: 1 }} />

@@ -41,9 +41,9 @@ export function Sidebar({
   const pathname = usePathname();
 
   const footerLinks = [
-    { id: "library", label: "Library", path: "/library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { id: "explorer", label: "Explorer", path: "/explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { id: "compare", label: "Compare", path: "", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "library", label: "Biblioteka", path: "/library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "explorer", label: "Eksploro", path: "/explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "compare", label: "Krahaso", path: "", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
   ];
 
   return (

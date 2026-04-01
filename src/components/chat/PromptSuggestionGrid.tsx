@@ -15,85 +15,137 @@ interface PromptSuggestionGridProps {
   selectedLawLabel?: string;
 }
 
-const PROMPT_GROUPS: PromptGroup[] = [
+const EU_PROMPT_GROUPS: PromptGroup[] = [
   {
-    title: "Fact Finding",
+    title: "GJETJE FAKTESH",
     prompts: [
-      { label: "Max GDPR fine", fullQuestion: "What is the maximum fine under GDPR for serious violations?" },
-      { label: "GDPR legal bases", fullQuestion: "What are the legal bases for processing personal data under GDPR Article 6?" },
-      { label: "AI Act deadline", fullQuestion: "When does the EU AI Act become applicable, and what are the key compliance deadlines?" },
+      { label: "Gjoba maksimale GDPR", fullQuestion: "Cila eshte gjoba maksimale sipas GDPR per shkelje serioze?" },
+      { label: "Bazat ligjore GDPR", fullQuestion: "Cilat jane bazat ligjore per perpunimin e te dhenave personale sipas nenit 6 te GDPR?" },
+      { label: "Afati i Aktit te IA", fullQuestion: "Kur behet i zbatueshem Akti i IA i BE-se dhe cilat jane afatet kryesore te pajtueshmerise?" },
       {
-        label: "Infringement procedures",
-        fullQuestion: "How does the EU infringement procedure work against Member States, step by step?",
+        label: "Procedurat e shkeljes",
+        fullQuestion: "Si funksionon procedura e shkeljes se BE-se ndaj shteteve anetare, hap pas hapi?",
       },
     ],
   },
   {
-    title: "Cross-Document Reasoning",
+    title: "ARSYETIM NDER-DOKUMENTESH",
     prompts: [
-      { label: "NIS2 and GDPR", fullQuestion: "How do NIS2 obligations interact with GDPR requirements for incident response?" },
+      { label: "NIS2 dhe GDPR", fullQuestion: "Si nderveprojne detyrimet e NIS2 me kerkesat e GDPR per reagimin ndaj incidenteve?" },
       {
-        label: "AI Act and medical devices",
-        fullQuestion: "How does the AI Act apply to AI systems used in medical devices under EU law?",
+        label: "Akti i IA dhe pajisjet mjekesore",
+        fullQuestion: "Si zbatohet Akti i IA per sistemet e IA te perdorura ne pajisje mjekesore sipas te drejtes se BE-se?",
       },
       {
-        label: "DSA and e-Commerce",
-        fullQuestion: "What are the main differences between the Digital Services Act and the e-Commerce Directive?",
+        label: "DSA dhe e-Commerce",
+        fullQuestion: "Cilat jane dallimet kryesore midis Aktit te Sherbimeve Dixhitale dhe Direktives se e-Commerce?",
       },
     ],
   },
   {
-    title: "Temporal Accuracy",
+    title: "SAKTESI KOHORE",
     prompts: [
       {
-        label: "GDPR vs Directive 95/46",
-        fullQuestion: "What changed when GDPR replaced Directive 95/46/EC, and which obligations became stricter?",
+        label: "GDPR kundrejt Direktives 95/46",
+        fullQuestion: "Cfare ndryshoi kur GDPR zevendesoi Direktiven 95/46/EC dhe cilat detyrime u bene me te rrepta?",
       },
       {
-        label: "AI Act entry into force",
-        fullQuestion: "On what date did the AI Act enter into force, and from when do its core provisions apply?",
+        label: "Hyrja ne fuqi e Aktit te IA",
+        fullQuestion: "Ne cilen date hyri ne fuqi Akti i IA dhe prej kur zbatohen dispozitat kryesore?",
       },
       {
-        label: "AI transitional provisions",
-        fullQuestion: "What are the AI Act transitional provisions and how do they affect existing AI systems?",
+        label: "Dispozitat kalimtare te IA",
+        fullQuestion: "Cilat jane dispozitat kalimtare te Aktit te IA dhe si ndikojne ato ne sistemet ekzistuese te IA?",
       },
     ],
   },
   {
-    title: "Hierarchical Reasoning",
+    title: "ARSYETIM HIERARKIK",
     prompts: [
-      { label: "Data localization", fullQuestion: "When is data localization allowed or restricted under EU law?" },
+      { label: "Lokalizimi i te dhenave", fullQuestion: "Kur lejohet ose kufizohet lokalizimi i te dhenave sipas te drejtes se BE-se?" },
       {
-        label: "Regulation vs Directive",
-        fullQuestion: "What is the legal difference between an EU Regulation and an EU Directive in practice?",
+        label: "Rregullore kundrejt Direktive",
+        fullQuestion: "Cili eshte dallimi juridik ne praktike midis nje Rregulloreje te BE-se dhe nje Direktive te BE-se?",
       },
     ],
   },
   {
-    title: "Edge Cases & Exceptions",
+    title: "RASTE KUFITARE DHE PERJASHTIME",
     prompts: [
-      { label: "GDPR outside EU", fullQuestion: "When does GDPR apply to companies located outside the European Union?" },
-      { label: "AI high risk", fullQuestion: "How does the AI Act define high-risk AI systems and what obligations apply?" },
+      { label: "GDPR jashte BE-se", fullQuestion: "Kur zbatohet GDPR per kompani te vendosura jashte Bashkimit Europian?" },
+      { label: "IA me rrezik te larte", fullQuestion: "Si i percakton Akti i IA sistemet me rrezik te larte dhe cilat detyrime zbatohen?" },
       {
-        label: "Automated decisions",
-        fullQuestion: "What rights do individuals have under GDPR regarding automated decision-making and profiling?",
+        label: "Vendime te automatizuara",
+        fullQuestion: "Cilat te drejta kane individet sipas GDPR lidhur me vendimmarrjen e automatizuar dhe profilizimin?",
       },
     ],
   },
 ];
 
-export function PromptSuggestionGrid({ onPromptClick, selectedLawLabel = "EU Law" }: PromptSuggestionGridProps) {
+const ALBANIAN_PROMPT_GROUPS: PromptGroup[] = [
+  {
+    title: "MBROJTJA E TE DHENAVE",
+    prompts: [
+      { label: "Bazat ligjore te GDPR", fullQuestion: "Cilat jane bazat ligjore per perpunimin e te dhenave personale sipas GDPR?" },
+      { label: "Te drejtat e subjektit", fullQuestion: "Cilat jane te drejtat kryesore te subjektit te te dhenave sipas GDPR?" },
+      { label: "Detyrimet e kontrolluesit", fullQuestion: "Cilat jane detyrimet kryesore te kontrolluesit sipas GDPR?" },
+    ],
+  },
+  {
+    title: "INTELIGJENCA ARTIFICIALE",
+    prompts: [
+      { label: "Qellimi i AI Act", fullQuestion: "Cili eshte qellimi i Rregullores se BE-se per Inteligjencen Artificiale (AI Act)?" },
+      { label: "Sistemet me rrezik te larte", fullQuestion: "Si i percakton AI Act sistemet me rrezik te larte dhe cilat detyrime zbatohen?" },
+      { label: "Praktikat e ndaluara", fullQuestion: "Cfare praktika te AI-se ndalohen sipas nenit 5 te AI Act?" },
+    ],
+  },
+  {
+    title: "SHERBIME DIXHITALE",
+    prompts: [
+      { label: "Detyrimet sipas DSA", fullQuestion: "Cilat jane detyrimet kryesore te platformave online sipas DSA?" },
+      { label: "DSA dhe e-Commerce", fullQuestion: "Cilat jane dallimet kryesore midis DSA dhe Direktives se e-Commerce?" },
+    ],
+  },
+  {
+    title: "SIGURIA KIBERNETIKE",
+    prompts: [
+      { label: "NIS2 ne praktike", fullQuestion: "Cilat jane detyrimet kryesore sipas NIS2 per menaxhimin e riskut kibernetik?" },
+      { label: "Raportimi i incidenteve", fullQuestion: "Cilat jane afatet e raportimit te incidenteve sipas NIS2?" },
+    ],
+  },
+  {
+    title: "HARMONIZIMI LIGJOR",
+    prompts: [
+      { label: "GDPR ne kontekst shqiptar", fullQuestion: "Si lidhen kerkesat e GDPR me kuadrin e mbrojtjes se te dhenave ne Shqiperi?" },
+      { label: "AI Act dhe tregu shqiptar", fullQuestion: "Si mund te ndikoje AI Act ne kompanite shqiptare qe ofrojne sherbime ne tregun e BE-se?" },
+    ],
+  },
+];
+
+export function PromptSuggestionGrid({ onPromptClick, selectedLawLabel = "Ligji i BE-se" }: PromptSuggestionGridProps) {
+  const isAlbanianLaw = selectedLawLabel === "Ligji Shqiptar";
+  const promptGroups = isAlbanianLaw ? ALBANIAN_PROMPT_GROUPS : EU_PROMPT_GROUPS;
+  const headingText =
+    isAlbanianLaw
+      ? "Pyet mbi Legjislacionin Shqiptar"
+      : selectedLawLabel === "Ligji i BE-se"
+        ? "Pyet per Ligjin e BE-se"
+        : `Pyet per ${selectedLawLabel}`;
+  const subheadingText = isAlbanianLaw
+    ? "Merr pergjigje ne shqip me referenca nga ligji i BE-se dhe konteksti i harmonizimit"
+    : "Merr pergjigje me referenca te traktateve dhe neneve specifike";
+
   return (
     <Box sx={{ width: "100%", maxWidth: 980, mx: "auto", pt: { xs: 2, sm: 4 } }}>
       <Typography sx={{ textAlign: "center", fontWeight: 600, fontSize: { xs: "1.1rem", sm: "1.35rem" } }}>
-        Ask about {selectedLawLabel}
+        {headingText}
       </Typography>
       <Typography sx={{ textAlign: "center", color: "hsl(var(--text-muted))", mt: 0.4, mb: 2.8, fontSize: "0.92rem" }}>
-        Get answers with references to specific treaties and articles
+        {subheadingText}
       </Typography>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.4 }}>
-        {PROMPT_GROUPS.map((group) => (
+        {promptGroups.map((group) => (
           <Paper
             key={group.title}
             sx={{

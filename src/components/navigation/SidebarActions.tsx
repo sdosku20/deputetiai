@@ -140,7 +140,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
         >
           <AddIcon sx={{ fontSize: 18 }} />
-          Ask a new question
+          Bej nje pyetje te re
         </Box>
       </Box>
 
@@ -157,7 +157,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
           sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
         >
-          <SidebarSectionHeader title="Projects" />
+          <SidebarSectionHeader title="Projektet" />
           <KeyboardArrowDownIcon
             sx={{
               ml: "auto",
@@ -171,7 +171,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         </Box>
         {openSections.projects && (
           <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))", px: 1.4, pt: 0.2 }}>
-            No projects yet
+            Ende nuk ka projekte
           </Typography>
         )}
       </Box>
@@ -189,7 +189,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
           sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
         >
-          <SidebarSectionHeader title="Bookmarks" />
+          <SidebarSectionHeader title="Faqeruajtes" />
           <KeyboardArrowDownIcon
             sx={{
               ml: "auto",
@@ -216,7 +216,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
           sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
         >
-          <SidebarSectionHeader title="Legal Alerts" />
+          <SidebarSectionHeader title="Sinjalizime Ligjore" />
           <KeyboardArrowDownIcon
             sx={{
               ml: "auto",
@@ -235,7 +235,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
             startIcon={<AddIcon />}
             sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
           >
-            New Alert
+            Sinjalizim i ri
           </Button>
         )}
       </Box>
@@ -253,7 +253,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
           sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
         >
-          <SidebarSectionHeader title="Saved Searches" />
+          <SidebarSectionHeader title="Kerkime te Ruajtura" />
           <KeyboardArrowDownIcon
             sx={{
               ml: "auto",
@@ -272,7 +272,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
             startIcon={<AddIcon />}
             sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
           >
-            Save Search
+            Ruaj kerkimin
           </Button>
         )}
       </Box>
@@ -281,7 +281,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         <TextField
           fullWidth
           size="small"
-          placeholder="Search..."
+          placeholder="Kerko..."
           slotProps={{
             input: {
               startAdornment: <SearchIcon sx={{ fontSize: 16, color: "hsl(var(--text-muted))", mr: 0.75 }} />,
@@ -312,7 +312,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
           sx={{ display: "flex", alignItems: "center", width: "100%", cursor: "pointer", py: 0.25 }}
         >
-          <SidebarSectionHeader title="History" />
+          <SidebarSectionHeader title="Historiku" />
           <KeyboardArrowDownIcon
             sx={{
               ml: "auto",
@@ -354,7 +354,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                     }}
                   >
                     <ListItemText
-                      primary={session.preview || "New conversation"}
+                      primary={session.preview || "Bisede e re"}
                       slotProps={{
                         primary: {
                           sx: {
@@ -383,8 +383,8 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                       color: "hsl(var(--text-muted))",
                       "&:hover": { backgroundColor: "hsl(var(--surface-muted))", color: "hsl(var(--text-primary))" },
                     }}
-                    title="Delete conversation"
-                    aria-label={`Delete conversation`}
+                    title="Fshi biseden"
+                    aria-label={`Fshi biseden`}
                     role="button"
                   >
                     <DeleteOutline sx={{ fontSize: 18 }} />
@@ -396,7 +396,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         ) : openSections.history ? (
           <Box sx={{ color: "hsl(var(--text-muted))", px: 1.4 }}>
             <Typography sx={{ fontSize: "0.82rem" }}>
-              No conversations yet
+              Ende nuk ka biseda
             </Typography>
           </Box>
         ) : null}

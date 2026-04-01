@@ -33,11 +33,11 @@ interface ProfileOption {
 }
 
 const PROFILE_OPTIONS: ProfileOption[] = [
-  { id: "general", label: "General", description: "Clear explanations for everyone" },
-  { id: "legal", label: "Legal", description: "Technical legal language" },
-  { id: "policy", label: "Policy", description: "Policy implications" },
-  { id: "academic", label: "Academic", description: "Scholarly analysis" },
-  { id: "compliance", label: "Compliance", description: "Practical guidance" },
+  { id: "general", label: "Pergjithshem", description: "Shpjegime te qarta per te gjithe" },
+  { id: "legal", label: "Ligjor", description: "Gjuhe teknike juridike" },
+  { id: "policy", label: "Politika", description: "Implikime te politikave" },
+  { id: "academic", label: "Akademik", description: "Analize shkencore" },
+  { id: "compliance", label: "Pajtueshmeri", description: "Udhezim praktik" },
 ];
 
 export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, focusInputSignal = 0 }: ComposerBarProps) {
@@ -82,7 +82,7 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, 
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={loading}
-          placeholder="Ask about EU law..."
+          placeholder="Shkruani pyetjen tuaj..."
           inputRef={inputRef}
           InputProps={{ disableUnderline: true }}
           sx={{
@@ -135,7 +135,7 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, 
               },
             }}
           >
-            Smart
+            Inteligjent
           </Button>
         </Box>
         <IconButton

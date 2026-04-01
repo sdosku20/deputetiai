@@ -132,10 +132,10 @@ export function MessageBubble({
           {isExpanded
             ? isAlbanian
               ? "Fshih Burimet & Detajet"
-              : "Hide Sources & Details"
+              : "Fshih Burimet & Detajet"
             : isAlbanian
               ? "Shfaq Burimet & Detajet Ligjore"
-              : "Show Sources & Legal Details"}
+              : "Shfaq Burimet & Detajet Ligjore"}
         </Button>
       )}
 
@@ -157,7 +157,7 @@ export function MessageBubble({
                 fontWeight: 600,
               }}
             >
-              Sources:
+              Burimet:
             </Typography>
             {sources.slice(0, 6).map((source, idx) => (
               <Box
@@ -209,7 +209,7 @@ export function MessageBubble({
                 }}
               >
                 <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))", lineHeight: 1 }}>
-                  +{sources.length - 6} more
+                  +{sources.length - 6} me shume
                 </Typography>
               </Box>
             )}
@@ -225,7 +225,7 @@ export function MessageBubble({
             startIcon={showReasoning ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
             sx={{ px: 0, color: "hsl(var(--text-muted))", "&:hover": { bgcolor: "transparent", color: "hsl(var(--text-primary))" } }}
           >
-            Thinking steps
+            Hapat e arsyetimit
           </Button>
           {showReasoning && (
             <Box sx={{ mt: 0.6, pl: 0.3 }}>
