@@ -295,12 +295,26 @@ export interface ChatCompletionResponse {
   metadata?: unknown;
 }
 
+export interface ChatSource {
+  label: string;
+  title?: string;
+  reference?: string;
+  treaty?: string;
+  article?: string;
+  documentId?: string;
+  articleHeading?: string;
+  textPreview?: string;
+  sourceType?: string;
+  score?: number;
+  dataSource?: "eu_law" | "albanian";
+}
+
 // Simplified response for our chat interface
 export interface ChatResponse {
   success: boolean;
   response: string;
   error?: string;
-  sources?: string[];
+  sources?: ChatSource[];
   reasoningSteps?: string[];
 }
 
@@ -348,59 +362,143 @@ class ChatAPIClient {
     this.apiClient = apiClient;
   }
 
-  private extractSources(rawSources: unknown, content: string): string[] {
+  private extractSources(rawSources: unknown, content: string): ChatSource[] {
     if (Array.isArray(rawSources)) {
       return rawSources
         .map((item) => {
-          if (typeof item === "string") return item.trim();
+          if (typeof item === "string") {
+            const text = item.trim();
+            return text ? { label: text } : null;
+          }
           if (item && typeof item === "object") {
             const record = item as Record<string, unknown>;
-            const label = record.label || record.title || record.reference || record.source || record.id;
-            if (typeof label === "string") return label.trim();
+            const rawLabel = record.label || record.title || record.reference || record.source || record.id;
+            if (typeof rawLabel === "string" && rawLabel.trim()) {
+              return {
+                label: rawLabel.trim(),
+                title: typeof record.title === "string" ? record.title : undefined,
+                reference: typeof record.reference === "string" ? record.reference : undefined,
+                treaty: typeof record.treaty === "string" ? record.treaty : undefined,
+                article: typeof record.article === "string" ? record.article : undefined,
+                documentId:
+                  typeof record.document_id === "string"
+                    ? record.document_id
+                    : typeof record.document_id === "number"
+                      ? String(record.document_id)
+                      : undefined,
+                articleHeading: typeof record.article_heading === "string" ? record.article_heading : undefined,
+                textPreview: typeof record.text_preview === "string" ? record.text_preview : undefined,
+                sourceType: typeof record.source_type === "string" ? record.source_type : undefined,
+                score: typeof record.score === "number" ? record.score : undefined,
+                dataSource: record.data_source === "albanian" ? "albanian" : record.data_source === "eu_law" ? "eu_law" : undefined,
+              };
+            }
           }
-          return "";
+          return null;
         })
-        .filter(Boolean)
+        .filter((item): item is ChatSource => Boolean(item))
         .slice(0, 12);
     }
 
-    const sourcesFromContent = content.match(/\*\*Sources:\*\*\s*([^\n]+)/i);
+    const sourcesFromContent = content.match(/(?:\*\*Sources:\*\*|Sources:)\s*([^\n]+)/i);
     if (sourcesFromContent?.[1]) {
       return sourcesFromContent[1]
         .split(",")
         .map((part) => part.trim())
         .filter(Boolean)
+        .map((label) => ({ label }))
         .slice(0, 12);
     }
 
     return [];
   }
 
-  private extractReasoningSteps(rawMetadata: unknown): string[] {
-    if (!rawMetadata || typeof rawMetadata !== "object") return [];
-    const metadata = rawMetadata as Record<string, unknown>;
-    const candidates = ["thinking_steps", "reasoning_steps", "steps", "thoughts"];
+  private inferLawSource(prompt: string, preferredSource: "eu_law" | "albanian"): "eu_law" | "albanian" {
+    const normalized = prompt.toLowerCase();
 
-    for (const key of candidates) {
-      const value = metadata[key];
-      if (Array.isArray(value)) {
-        const steps = value
-          .map((step) => {
-            if (typeof step === "string") return step.trim();
-            if (step && typeof step === "object") {
-              const record = step as Record<string, unknown>;
-              const txt = record.text || record.content || record.summary || record.title;
-              return typeof txt === "string" ? txt.trim() : "";
-            }
-            return "";
-          })
-          .filter(Boolean)
-          .slice(0, 8);
-        if (steps.length > 0) return steps;
+    const euLawMarkers = [
+      "gdpr",
+      "dsa",
+      "dma",
+      "ai act",
+      "nis2",
+      "eu law",
+      "ligji i be",
+      "ligjin e be",
+      "regulation (eu)",
+      "directive (eu)",
+      "eur-lex",
+      "tfeu",
+      "teu",
+      "cjeu",
+      "european union",
+      "be-se",
+    ];
+
+    const albanianLawMarkers = [
+      "ligji shqiptar",
+      "legjislacionin shqiptar",
+      "republika e shqiperise",
+      "republikës së shqipërisë",
+      "kushtetuta",
+      "gjykata kushtetuese",
+      "spak",
+      "bkh",
+      "prokuroria e posaçme",
+      "prokuroria e posacme",
+      "neni i kodit penal",
+      "kodi penal",
+      "kodi i procedures penale",
+      "qbz",
+      "fletorja zyrtare",
+      "ligji nr.",
+      "ligj nr.",
+    ];
+
+    const hasEuMarker = euLawMarkers.some((marker) => normalized.includes(marker));
+    const hasAlbanianMarker = albanianLawMarkers.some((marker) => normalized.includes(marker));
+
+    if (hasAlbanianMarker && !hasEuMarker) return "albanian";
+    if (hasEuMarker && !hasAlbanianMarker) return "eu_law";
+    return preferredSource;
+  }
+
+  private extractReasoningSteps(rawMetadata: unknown, content: string, sourcesCount: number): string[] {
+    if (rawMetadata && typeof rawMetadata === "object") {
+      const metadata = rawMetadata as Record<string, unknown>;
+      const candidates = ["thinking_steps", "reasoning_steps", "steps", "thoughts"];
+
+      for (const key of candidates) {
+        const value = metadata[key];
+        if (Array.isArray(value)) {
+          const steps = value
+            .map((step) => {
+              if (typeof step === "string") return step.trim();
+              if (step && typeof step === "object") {
+                const record = step as Record<string, unknown>;
+                const txt = record.text || record.content || record.summary || record.title;
+                return typeof txt === "string" ? txt.trim() : "";
+              }
+              return "";
+            })
+            .filter(Boolean)
+            .slice(0, 8);
+          if (steps.length > 0) return steps;
+        }
       }
     }
 
-    return [];
+    const fallbackSteps: string[] = [];
+    fallbackSteps.push("Klasifikimi i pyetjes dhe percaktimi i kontekstit ligjor");
+    fallbackSteps.push("Kerkimi i fragmenteve relevante ne bazen e burimeve");
+    if (sourcesCount > 0) {
+      fallbackSteps.push(`Vleresimi i ${sourcesCount} burimeve me relevante`);
+    }
+    if (/retrieval:/i.test(content)) {
+      fallbackSteps.push("Pergjigjja u ndertua mbi fragmentet e rikuperuara (retrieval)");
+    }
+    fallbackSteps.push("Sinteza e pergjigjes duke respektuar kufizimet e evidences");
+    return fallbackSteps;
   }
 
   /**
@@ -450,7 +548,8 @@ class ChatAPIClient {
       // Send an abstracted payload to the local proxy. The proxy builds the
       // backend OpenAI-compatible shape server-side.
       const selectedLaw = typeof window !== 'undefined' ? localStorage.getItem('selected_law') : null;
-      const source = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
+      const preferredSource: "eu_law" | "albanian" = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
+      const source = this.inferLawSource(userMessage, preferredSource);
       const requestBody = {
         prompt: userMessage,
         source,
@@ -468,9 +567,11 @@ class ChatAPIClient {
       });
 
       // Step 4: Send request via local proxy to keep API key server-side
+      const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
       const proxyResponse = await axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
         headers: {
           'Content-Type': 'application/json',
+          ...(jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {}),
         },
         timeout: 120000,
       });
@@ -504,7 +605,7 @@ class ChatAPIClient {
         ? `${assistantMessage}\n\nref: ${refId}`
         : assistantMessage;
       const sources = this.extractSources(response.sources, assistantMessage);
-      const reasoningSteps = this.extractReasoningSteps(response.metadata);
+      const reasoningSteps = this.extractReasoningSteps(response.metadata, assistantMessage, sources.length);
       console.log('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
 
       // Store conversation in localStorage for session management

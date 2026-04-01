@@ -18,6 +18,7 @@ type ChatProxyRequest = {
   source?: string;
 };
 
+
 type UpstreamChatResponse = {
   id?: string;
   created?: number;
@@ -86,6 +87,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
     clearTimeout(timeoutId);
   }
 }
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -164,10 +166,16 @@ export async function POST(request: NextRequest) {
       source,
       responsePreview: responseText.slice(0, 300),
     });
-    return NextResponse.json(
-      { detail: 'Service is temporarily unavailable. Please try again in a moment.' },
-      { status: upstreamResponse.status }
-    );
+
+    try {
+      const parsedError = JSON.parse(responseText);
+      return NextResponse.json(parsedError, { status: upstreamResponse.status });
+    } catch {
+      return NextResponse.json(
+        { detail: responseText || 'Service is temporarily unavailable. Please try again in a moment.' },
+        { status: upstreamResponse.status }
+      );
+    }
   } catch (error: any) {
     if (error?.name === 'AbortError') {
       return NextResponse.json(

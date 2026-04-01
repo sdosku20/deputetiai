@@ -15,7 +15,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/navigation/Sidebar";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -55,6 +55,8 @@ const DECADE_OPTIONS = ["All years", "2020s", "2010s", "2000s", "1990s", "1980s"
 
 export default function ExplorerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedDocId = searchParams.get("doc_id");
   const { user: authUser, logout } = useAuth();
   const [source, setSource] = useState<SourceKey>("eu_law");
   const [query, setQuery] = useState("");
@@ -67,6 +69,22 @@ export default function ExplorerPage() {
   const [selectedDocDetail, setSelectedDocDetail] = useState<Record<string, unknown> | null>(null);
   const [chunkQuery, setChunkQuery] = useState("");
   const [selectedChunkKey, setSelectedChunkKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requestedSource = searchParams.get("source");
+    const requestedQuery = searchParams.get("q");
+    const requestedDocId = searchParams.get("doc_id");
+
+    if (requestedSource === "eu_law" || requestedSource === "albanian") {
+      setSource(requestedSource);
+    }
+    if (requestedQuery) {
+      setQuery(requestedQuery);
+    }
+    if (requestedDocId) {
+      setSelectedId(requestedDocId);
+    }
+  }, [searchParams]);
 
   const userForHeader = authUser
     ? {
@@ -91,7 +109,31 @@ export default function ExplorerPage() {
           : `/api/library?source=${encodeURIComponent(source)}&page=1&page_size=200`;
 
       const response = await fetch(url, { headers: { Authorization: `Bearer ${jwtToken}` } });
-      if (!response.ok) throw new Error(`Explorer request failed: ${response.status}`);
+      if (!response.ok) {
+        if (requestedDocId) {
+          const docRes = await fetch(
+            `/api/library?source=${encodeURIComponent(source)}&doc_id=${encodeURIComponent(requestedDocId)}`,
+            { headers: { Authorization: `Bearer ${jwtToken}` } }
+          );
+          if (docRes.ok) {
+            const singleDoc = (await docRes.json()) as Record<string, unknown>;
+            const fallbackDoc: ExplorerDocument = {
+              id: String(singleDoc.document_id || singleDoc.id || requestedDocId),
+              title: String(singleDoc.title || "Pa titull"),
+              subtitle: String(singleDoc.subtitle || ""),
+              doc_type: String(singleDoc.doc_type || "Dokument"),
+              date: String(singleDoc.date || ""),
+              in_force: Boolean(singleDoc.in_force),
+              chunk_count: Number(singleDoc.chunk_count || 0),
+            };
+            setDocuments([fallbackDoc]);
+            setTotal(1);
+            setSelectedId(fallbackDoc.id);
+            return;
+          }
+        }
+        throw new Error(`Explorer request failed: ${response.status}`);
+      }
 
       if (query.trim().length > 0) {
         const payload = (await response.json()) as { results: Array<Record<string, unknown>>; total: number };
@@ -118,7 +160,7 @@ export default function ExplorerPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, source]);
+  }, [query, requestedDocId, source]);
 
   useEffect(() => {
     const t = setTimeout(fetchDocuments, 180);
@@ -221,6 +263,22 @@ export default function ExplorerPage() {
     setChunkQuery("");
     setSelectedChunkKey(null);
   }, [selectedChunks, selectedId]);
+
+  useEffect(() => {
+    const requestedArticle = searchParams.get("article")?.trim().toLowerCase();
+    if (!requestedArticle || selectedChunks.length === 0) return;
+
+    const matched = selectedChunks.find((chunk) => {
+      const articleLabel = String(chunk.article_label || chunk.group_label || "").toLowerCase();
+      const articleTitle = String(chunk.article_title || chunk.group_title || "").toLowerCase();
+      return articleLabel.includes(requestedArticle) || articleTitle.includes(requestedArticle);
+    });
+
+    if (matched) {
+      setChunkQuery(searchParams.get("article") || "");
+      setSelectedChunkKey(matched.key);
+    }
+  }, [searchParams, selectedChunks]);
 
   const groupCounts = useMemo(() => {
     const groups = new Map<string, number>();

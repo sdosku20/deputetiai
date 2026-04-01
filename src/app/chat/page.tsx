@@ -295,7 +295,7 @@ function ChatPageContent() {
                 mt: isMobile ? 6 : 0,
               }}
             >
-              <TopToolbar />
+              {displayMessages.length === 0 && <TopToolbar />}
               <Box sx={{ width: "100%", maxWidth: 780, mx: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
                 {displayMessages.length === 0 ? (
                   <PromptSuggestionGrid onPromptClick={handleSuggestionClick} selectedLawLabel={selectedLawLabel} />

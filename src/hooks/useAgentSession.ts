@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { chatClient, ChatMessage, ChatResponse } from "@/lib/api/client";
+import type { ChatSource } from "@/lib/api/client";
 
 export interface AgentMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
-  sources?: string[];
+  sources?: ChatSource[];
   reasoningSteps?: string[];
 }
 
