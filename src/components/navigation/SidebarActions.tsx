@@ -144,6 +144,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
         </Box>
       </Box>
 
+      {/* Temporarily disabled: PROJEKTET
       <Box sx={{ px: 2.5 }}>
         <Box
           onClick={() => toggleSection("projects")}
@@ -175,7 +176,9 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           </Typography>
         )}
       </Box>
+      */}
 
+      {/* Temporarily disabled: FAQERUAJTES, SINJALIZIME LIGJORE, KERKIME TE RUAJTURA
       <Box sx={{ px: 2.5 }}>
         <Box
           onClick={() => toggleSection("bookmarks")}
@@ -276,7 +279,9 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           </Button>
         )}
       </Box>
+      */}
 
+      {/* Temporarily disabled: sidebar search bar
       <Box sx={{ px: 2.5, pt: 0.5 }}>
         <TextField
           fullWidth
@@ -298,6 +303,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
           }}
         />
       </Box>
+      */}
 
       <Box sx={{ display: "flex", alignItems: "center", px: 2.5, pt: 0.8, pb: 0.4 }}>
         <Box

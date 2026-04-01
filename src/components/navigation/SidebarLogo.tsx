@@ -21,9 +21,7 @@ export function SidebarLogo({
       <Box sx={{ width, height }}>
         <Image src={logoSrc} alt={alt} width={width} height={height} style={{ objectFit: "contain" }} priority />
       </Box>
-      <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.14em", color: "hsl(var(--text-primary))" }}>
-        AVOKATI AI
-      </Typography>
+     
     </Box>
   );
 }
