@@ -33,6 +33,8 @@ export function useAgentSession(sessionId: string | null = null) {
         role: msg.role as "user" | "assistant",
         content: msg.content,
         timestamp: new Date().toISOString(),
+        sources: msg.sources,
+        reasoningSteps: msg.reasoningSteps,
       }));
       
       setMessages(converted);

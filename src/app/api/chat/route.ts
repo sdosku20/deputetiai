@@ -28,6 +28,22 @@ type UpstreamChatResponse = {
   metadata?: unknown;
 };
 
+type UpstreamConversationCreateResponse = {
+  id?: string;
+};
+
+type UpstreamConversationMessageResponse = {
+  tracking_id?: string | number;
+  assistant_message?: {
+    id?: string;
+    role?: string;
+    content?: string;
+    sources?: unknown;
+    metadata?: unknown;
+    created_at?: string;
+  };
+};
+
 function getBackendBaseUrl(): string {
   let baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
   if (baseUrl.includes('#')) {
@@ -78,6 +94,12 @@ function normalizeSource(input: unknown): 'eu_law' | 'albanian' {
   return ALLOWED_SOURCES.has(normalized) ? (normalized as 'eu_law' | 'albanian') : 'eu_law';
 }
 
+function getBearerAuthHeader(request: NextRequest): string | null {
+  const auth = request.headers.get('authorization');
+  if (!auth) return null;
+  return auth.toLowerCase().startsWith('bearer ') ? auth : null;
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -120,6 +142,144 @@ export async function POST(request: NextRequest) {
       data_source: source,
       messages: [{ role: 'user', content: prompt }],
     };
+
+    // For albanian mode, use conversation messages endpoint because it returns
+    // Albanian corpus sources (e.g. qbz) while /v1/chat/completions currently
+    // returns EU/EURLEX-only sources even with data_source=albanian.
+    if (source === 'albanian') {
+      const authHeader = getBearerAuthHeader(request);
+      if (!authHeader) {
+        return NextResponse.json(
+          { detail: 'Authorization token is required for Albanian mode.' },
+          { status: 401 }
+        );
+      }
+
+      const backendBase = getBackendBaseUrl();
+      const createConversationResponse = await fetchWithTimeout(
+        `${backendBase}/api/v1/conversations`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            title: 'Bisede e re',
+            profile: 'general',
+          }),
+          cache: 'no-store',
+        }
+      );
+
+      if (!createConversationResponse.ok) {
+        const createText = await createConversationResponse.text();
+        return NextResponse.json(
+          { detail: createText || 'Failed to create conversation.' },
+          { status: createConversationResponse.status }
+        );
+      }
+
+      let createdConversation: UpstreamConversationCreateResponse | null = null;
+      try {
+        createdConversation = (await createConversationResponse.json()) as UpstreamConversationCreateResponse;
+      } catch {
+        createdConversation = null;
+      }
+
+      const conversationId = createdConversation?.id;
+      if (!conversationId) {
+        return NextResponse.json(
+          { detail: 'Invalid conversation creation response.' },
+          { status: 502 }
+        );
+      }
+
+      const sendMessageResponse = await fetchWithTimeout(
+        `${backendBase}/api/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            content: prompt,
+            data_source: 'albanian',
+          }),
+          cache: 'no-store',
+        }
+      );
+
+      const sendMessageText = await sendMessageResponse.text();
+      if (!sendMessageResponse.ok) {
+        try {
+          const parsedError = JSON.parse(sendMessageText);
+          return NextResponse.json(parsedError, { status: sendMessageResponse.status });
+        } catch {
+          return NextResponse.json(
+            { detail: sendMessageText || 'Failed to get Albanian response.' },
+            { status: sendMessageResponse.status }
+          );
+        }
+      }
+
+      let parsedMessage: UpstreamConversationMessageResponse | null = null;
+      try {
+        parsedMessage = JSON.parse(sendMessageText) as UpstreamConversationMessageResponse;
+      } catch {
+        parsedMessage = null;
+      }
+
+      const assistant = parsedMessage?.assistant_message;
+      const assistantContent = assistant?.content;
+      if (!assistantContent) {
+        return NextResponse.json(
+          { detail: 'Invalid conversation message response format.' },
+          { status: 502 }
+        );
+      }
+
+      const syntheticId =
+        assistant?.id ||
+        (parsedMessage?.tracking_id ? `chatcmpl-${parsedMessage.tracking_id}` : `chatcmpl-${Date.now()}`);
+
+      const safeResponse = {
+        id: syntheticId,
+        created: Math.floor(Date.now() / 1000),
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: assistantContent,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: undefined,
+        sources: assistant?.sources ?? [],
+        metadata: {
+          ...(assistant?.metadata && typeof assistant.metadata === 'object' ? assistant.metadata : {}),
+          data_source: 'albanian',
+          via: 'conversations_api',
+          conversation_id: conversationId,
+        },
+      };
+
+      // Best-effort cleanup to avoid leaving temporary conversations.
+      fetch(`${backendBase}/api/v1/conversations/${encodeURIComponent(conversationId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: authHeader,
+        },
+        cache: 'no-store',
+      }).catch(() => {
+        // no-op
+      });
+
+      return NextResponse.json(safeResponse, { status: 200 });
+    }
 
     const backendUrl = `${getBackendBaseUrl()}/v1/chat/completions`;
     const requestInit: RequestInit = {

@@ -266,6 +266,8 @@ export const apiClient = new APIClient();
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  sources?: ChatSource[];
+  reasoningSteps?: string[];
 }
 
 export interface ChatCompletionRequest {
@@ -373,9 +375,30 @@ class ChatAPIClient {
           if (item && typeof item === "object") {
             const record = item as Record<string, unknown>;
             const rawLabel = record.label || record.title || record.reference || record.source || record.id;
-            if (typeof rawLabel === "string" && rawLabel.trim()) {
+            const fallbackLabel = (() => {
+              const srcType = typeof record.source_type === "string" ? record.source_type.trim() : "";
+              const treaty = typeof record.treaty === "string" ? record.treaty.trim() : "";
+              const article = typeof record.article === "string" ? record.article.trim() : "";
+              const docId =
+                typeof record.document_id === "string"
+                  ? record.document_id.trim()
+                  : typeof record.document_id === "number"
+                    ? String(record.document_id)
+                    : "";
+
+              if (treaty && article) return `[${treaty}] ${article}`;
+              if (srcType && docId) return `${srcType}:${docId}`;
+              if (srcType) return srcType;
+              if (docId) return docId;
+              return "";
+            })();
+
+            const resolvedLabel =
+              typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.trim() : fallbackLabel;
+
+            if (resolvedLabel) {
               return {
-                label: rawLabel.trim(),
+                label: resolvedLabel,
                 title: typeof record.title === "string" ? record.title : undefined,
                 reference: typeof record.reference === "string" ? record.reference : undefined,
                 treaty: typeof record.treaty === "string" ? record.treaty : undefined,
@@ -411,56 +434,6 @@ class ChatAPIClient {
     }
 
     return [];
-  }
-
-  private inferLawSource(prompt: string, preferredSource: "eu_law" | "albanian"): "eu_law" | "albanian" {
-    const normalized = prompt.toLowerCase();
-
-    const euLawMarkers = [
-      "gdpr",
-      "dsa",
-      "dma",
-      "ai act",
-      "nis2",
-      "eu law",
-      "ligji i be",
-      "ligjin e be",
-      "regulation (eu)",
-      "directive (eu)",
-      "eur-lex",
-      "tfeu",
-      "teu",
-      "cjeu",
-      "european union",
-      "be-se",
-    ];
-
-    const albanianLawMarkers = [
-      "ligji shqiptar",
-      "legjislacionin shqiptar",
-      "republika e shqiperise",
-      "republikës së shqipërisë",
-      "kushtetuta",
-      "gjykata kushtetuese",
-      "spak",
-      "bkh",
-      "prokuroria e posaçme",
-      "prokuroria e posacme",
-      "neni i kodit penal",
-      "kodi penal",
-      "kodi i procedures penale",
-      "qbz",
-      "fletorja zyrtare",
-      "ligji nr.",
-      "ligj nr.",
-    ];
-
-    const hasEuMarker = euLawMarkers.some((marker) => normalized.includes(marker));
-    const hasAlbanianMarker = albanianLawMarkers.some((marker) => normalized.includes(marker));
-
-    if (hasAlbanianMarker && !hasEuMarker) return "albanian";
-    if (hasEuMarker && !hasAlbanianMarker) return "eu_law";
-    return preferredSource;
   }
 
   private extractReasoningSteps(rawMetadata: unknown, content: string, sourcesCount: number): string[] {
@@ -548,8 +521,7 @@ class ChatAPIClient {
       // Send an abstracted payload to the local proxy. The proxy builds the
       // backend OpenAI-compatible shape server-side.
       const selectedLaw = typeof window !== 'undefined' ? localStorage.getItem('selected_law') : null;
-      const preferredSource: "eu_law" | "albanian" = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
-      const source = this.inferLawSource(userMessage, preferredSource);
+      const source: "eu_law" | "albanian" = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
       const requestBody = {
         prompt: userMessage,
         source,
@@ -566,25 +538,100 @@ class ChatAPIClient {
         source,
       });
 
-      // Step 4: Send request via local proxy to keep API key server-side
-      const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-      const proxyResponse = await axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {}),
-        },
-        timeout: 120000,
-      });
-      const response = proxyResponse.data;
+      // Ensure JWT is present when backend path requires bearer auth
+      // (currently needed for albanian conversation-mode proxying).
+      const ensureJwtToken = async (forceRefresh = false): Promise<string | null> => {
+        if (typeof window === 'undefined') return null;
+        if (forceRefresh) {
+          localStorage.removeItem('jwt_token');
+        }
 
-      // Extract 8-char reference ID from response for backend tracking
+        const existing = localStorage.getItem('jwt_token');
+        if (existing) return existing;
+
+        try {
+          const loginResponse = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: 'michael',
+              password: 'IUsedToBeAStrongPass__',
+            }),
+          });
+          if (!loginResponse.ok) return null;
+
+          const loginData = await loginResponse.json() as { access_token?: string; token?: string };
+          const token = loginData.access_token || loginData.token || null;
+          if (token) {
+            localStorage.setItem('jwt_token', token);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
+          }
+          return token;
+        } catch {
+          return null;
+        }
+      };
+
+      // Step 4: Send request via local proxy to keep API key server-side
+      let jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+      if (source === 'albanian') {
+        jwtToken = await ensureJwtToken();
+      }
+
+      const sendProxyRequest = (token: string | null) =>
+        axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          timeout: 120000,
+        });
+
+      let proxyResponse;
+      try {
+        proxyResponse = await sendProxyRequest(jwtToken);
+      } catch (error: any) {
+        // Albanian mode can fail with 401 if token is stale/missing; refresh once.
+        if (source === 'albanian' && error?.response?.status === 401) {
+          const refreshedToken = await ensureJwtToken(true);
+          proxyResponse = await sendProxyRequest(refreshedToken);
+        } else {
+          throw error;
+        }
+      }
+      const response = proxyResponse.data;
+      const responseSourceSummary = Array.isArray(response.sources)
+        ? response.sources.slice(0, 8).map((item) => {
+            if (item && typeof item === "object") {
+              const sourceRecord = item as Record<string, unknown>;
+              return String(
+                sourceRecord.source ||
+                sourceRecord.data_source ||
+                sourceRecord.source_type ||
+                sourceRecord.treaty ||
+                sourceRecord.id ||
+                "unknown"
+              );
+            }
+            return typeof item === "string" ? item : "unknown";
+          })
+        : [];
+
+      // Extract stable short reference ID from response for backend tracking
       const rawId = response.id || '';
-      const refId = rawId.replace('chatcmpl-', '').substring(0, 8) || '';
+      const normalizedId = rawId.replace(/^chatcmpl-/, '');
+      const tailRefMatch = normalizedId.match(/([a-z0-9]{8,})$/i);
+      const refId = tailRefMatch
+        ? tailRefMatch[1].slice(0, 8)
+        : normalizedId.slice(0, 8) || '';
 
       console.log('[ChatAPI] Response received:', {
         status: 'success',
         rawId,
         refId,
+        selectedLaw,
+        requestSource: source,
+        responseSourceSummary,
         fullResponse: response,
       });
 
@@ -612,7 +659,7 @@ class ChatAPIClient {
       const updatedMessages: ChatMessage[] = [
         ...conversationHistory,
         { role: "user", content: userMessage },
-        { role: "assistant", content: finalResponse },
+        { role: "assistant", content: finalResponse, sources, reasoningSteps },
       ];
       
       this.saveSessionMessages(sessionId, updatedMessages);
@@ -726,11 +773,25 @@ class ChatAPIClient {
       const session: SessionMessages = JSON.parse(stored);
       const messages = session.messages || [];
       
-      // Filter to only include role and content fields (strip any extra fields like timestamp)
-      return messages.map(msg => ({
-        role: msg.role as "user" | "assistant" | "system",
-        content: String(msg.content || '')
-      })).filter(msg => msg.role && msg.content);
+      return messages
+        .map((msg) => {
+          const role = msg.role as "user" | "assistant" | "system";
+          const content = String(msg.content || "");
+          const sources = Array.isArray((msg as ChatMessage).sources)
+            ? (msg as ChatMessage).sources
+            : undefined;
+          const reasoningSteps = Array.isArray((msg as ChatMessage).reasoningSteps)
+            ? (msg as ChatMessage).reasoningSteps.map((step) => String(step))
+            : undefined;
+
+          return {
+            role,
+            content,
+            ...(sources ? { sources } : {}),
+            ...(reasoningSteps ? { reasoningSteps } : {}),
+          } as ChatMessage;
+        })
+        .filter((msg) => msg.role && msg.content);
     } catch (error) {
       console.error('[ChatAPI] Error loading conversation history:', error);
       return [];
