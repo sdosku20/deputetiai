@@ -343,6 +343,13 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                     display: "flex",
                     alignItems: "center",
                     gap: 0.5,
+                    px: 0.45,
+                    py: 0.2,
+                    borderRadius: 1,
+                    transition: "background-color 140ms ease",
+                    "&:hover": {
+                      backgroundColor: "hsl(var(--surface-muted))",
+                    },
                     "& .delete-btn": { opacity: 0, transition: "opacity 140ms ease" },
                     "&:hover .delete-btn": { opacity: 1 },
                   }}
@@ -350,13 +357,12 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                   <ListItemButton
                     onClick={() => handleSessionClick(session.session_id)}
                     sx={{
-                      px: 0.75,
-                      py: 0.55,
+                      px: 0.3,
+                      py: 0.35,
                       borderRadius: 2,
                       flex: 1,
-                      "&:hover": {
-                        backgroundColor: "hsl(var(--surface-muted))",
-                      },
+                      bgcolor: "transparent",
+                      "&:hover": { bgcolor: "transparent" },
                     }}
                   >
                     <ListItemText
@@ -387,7 +393,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                       borderRadius: 1,
                       cursor: "pointer",
                       color: "hsl(var(--text-muted))",
-                      "&:hover": { backgroundColor: "hsl(var(--surface-muted))", color: "hsl(var(--text-primary))" },
+                      "&:hover": { color: "hsl(var(--text-primary))" },
                     }}
                     title="Fshi biseden"
                     aria-label={`Fshi biseden`}

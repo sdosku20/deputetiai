@@ -91,7 +91,7 @@ export function Sidebar({
       </Box>
 
       <Box sx={{ px: 2, py: 1.5, borderTop: "1px solid hsl(var(--border-soft))" }}>
-        <Box>
+        <Box sx={{ display: "grid", gap: 0.5 }}>
           {footerLinks.map((item) => (
             <Box
               key={item.id}
@@ -105,7 +105,7 @@ export function Sidebar({
                 gap: 1,
                 px: 1,
                 py: 0.8,
-                borderRadius: 2,
+                borderRadius: 1,
                 color: pathname === item.path ? "hsl(var(--text-primary))" : "hsl(var(--text-primary))",
                 border: "none",
                 background: pathname === item.path ? "hsl(var(--surface-muted))" : "transparent",
