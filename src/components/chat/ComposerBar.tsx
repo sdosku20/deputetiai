@@ -13,7 +13,6 @@ import {
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -43,7 +42,6 @@ const PROFILE_OPTIONS: ProfileOption[] = [
 export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, focusInputSignal = 0 }: ComposerBarProps) {
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedProfile, setSelectedProfile] = useState("general");
-  const [smartEnabled, setSmartEnabled] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const activeProfile = useMemo(
@@ -112,30 +110,6 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, 
             }}
           >
             {activeProfile.label}
-          </Button>
-          <Button
-            onClick={() => setSmartEnabled((prev) => !prev)}
-            aria-pressed={smartEnabled}
-            startIcon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 14 }} />}
-            sx={{
-              minWidth: "auto",
-              px: 0.9,
-              py: 0.3,
-              borderRadius: 99,
-              border: smartEnabled ? "1px solid hsl(var(--ring))" : "1px solid hsl(var(--border-soft))",
-              backgroundColor: smartEnabled ? "hsl(var(--ring) / 0.12)" : "hsl(var(--surface-muted))",
-              color: smartEnabled ? "hsl(var(--ring))" : "hsl(var(--text-primary))",
-              fontSize: "0.76rem",
-              fontWeight: 600,
-              textTransform: "none",
-              lineHeight: 1,
-              "&:hover": {
-                backgroundColor: smartEnabled ? "hsl(var(--ring) / 0.16)" : "hsl(var(--surface-muted))",
-                borderColor: smartEnabled ? "hsl(var(--ring))" : "hsl(var(--text-muted))",
-              },
-            }}
-          >
-            Inteligjent
           </Button>
         </Box>
         <IconButton

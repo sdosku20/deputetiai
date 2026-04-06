@@ -98,7 +98,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
     );
   }
 
-  const historyItems = sessions.slice(0, 8);
+  const historyItems = sessions;
 
   const toggleSection = (key: keyof typeof openSections) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));

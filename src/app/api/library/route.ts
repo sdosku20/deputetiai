@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const backendBase = getBackendBaseUrl();
     const backendUrl = docId
       ? mode === "chunks"
-        ? `${backendBase}/api/v1/explorer/v2/${source}/documents/${encodeURIComponent(docId)}/chunks?page=1&page_size=200`
+        ? `${backendBase}/api/v1/explorer/v2/${source}/documents/${encodeURIComponent(docId)}/chunks?page=${encodeURIComponent(page)}&page_size=${encodeURIComponent(pageSize)}`
         : `${backendBase}/api/v1/explorer/v2/${source}/documents/${encodeURIComponent(docId)}`
       : q.trim()
         ? `${backendBase}/api/v1/explorer/v2/${source}/search?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit)}`

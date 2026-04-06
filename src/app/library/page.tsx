@@ -33,12 +33,17 @@ interface LibraryResult {
   docType: string;
   date: string;
   score?: number;
+  chunkId?: string;
 }
 
 const SOURCE_FILTERS: SourceFilter[] = [
   { key: "eu_law", label: "Ligji i BE-se" },
   { key: "albanian", label: "Ligji Shqiptar" },
 ];
+
+const LIST_PAGE_SIZE = 200;
+const SEARCH_LIMIT_FALLBACKS = [50, 25, 10];
+const MIN_SEARCH_LENGTH = 3;
 
 export default function LibraryPage() {
   const { user: authUser, logout } = useAuth();
@@ -47,12 +52,15 @@ export default function LibraryPage() {
   const [results, setResults] = useState<LibraryResult[]>([]);
   const [selectedSources, setSelectedSources] = useState<SourceKey[]>(["eu_law", "albanian"]);
   const [totalCount, setTotalCount] = useState(0);
+  const [expandedItemKey, setExpandedItemKey] = useState<string | null>(null);
+  const [expandedTextByItem, setExpandedTextByItem] = useState<Record<string, string>>({});
+  const [loadingItemKeys, setLoadingItemKeys] = useState<Record<string, boolean>>({});
 
   const userForHeader = authUser
     ? {
-        id: authUser.id || "",
-        email: authUser.email || "",
-      }
+      id: authUser.id || "",
+      email: authUser.email || "",
+    }
     : undefined;
 
   const fetchLibraryData = useCallback(async () => {
@@ -71,32 +79,93 @@ export default function LibraryPage() {
         return;
       }
 
-      const isSearch = query.trim().length > 0;
+      const trimmedQuery = query.trim();
+      const isSearch = trimmedQuery.length >= MIN_SEARCH_LENGTH;
+      if (trimmedQuery.length > 0 && trimmedQuery.length < MIN_SEARCH_LENGTH) {
+        setResults([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+      const normalizeSearchVariants = (raw: string): string[] => {
+        const base = raw.trim();
+        if (!base) return [];
+
+        const withoutDiacritics = base
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/ë/g, "e")
+          .replace(/Ë/g, "E");
+
+        const simplified = base
+          .replace(/^\s*(ligji|kodi)\s+(i|te|t[eë])\s+/i, "")
+          .trim();
+
+        return Array.from(new Set([base, withoutDiacritics, simplified].filter(Boolean)));
+      };
+
       const requests = selectedSources.map(async (source) => {
         if (isSearch) {
-          const response = await fetch(
-            `/api/library?source=${encodeURIComponent(source)}&q=${encodeURIComponent(query.trim())}&limit=50`,
-            { headers: { Authorization: `Bearer ${jwtToken}` } }
-          );
-          if (!response.ok) {
-            throw new Error(`Search request failed: ${response.status}`);
-          }
-          const payload = (await response.json()) as { results: Array<Record<string, unknown>>; total: number };
+          const variants = normalizeSearchVariants(trimmedQuery);
+          let bestPayload: { results: Array<Record<string, unknown>>; total: number } = { results: [], total: 0 };
+          let lastSearchError: Error | null = null;
 
-          const mapped = (payload.results || []).map((item) => ({
-            id: String(item.id || item.document_id || `${source}-${Math.random()}`),
+          for (const variant of variants) {
+            let variantPayload: { results: Array<Record<string, unknown>>; total: number } | null = null;
+
+            for (const limit of SEARCH_LIMIT_FALLBACKS) {
+              const response = await fetch(
+                `/api/library?source=${encodeURIComponent(source)}&q=${encodeURIComponent(variant)}&limit=${limit}`,
+                { headers: { Authorization: `Bearer ${jwtToken}` } }
+              );
+
+              if (response.ok) {
+                variantPayload = (await response.json()) as { results: Array<Record<string, unknown>>; total: number };
+                break;
+              }
+
+              // Backend can reject large limits; fall back to smaller limits.
+              if (response.status === 422) {
+                continue;
+              }
+
+              lastSearchError = new Error(`Search request failed: ${response.status}`);
+              break;
+            }
+
+            if (!variantPayload) {
+              continue;
+            }
+
+            const payload = variantPayload;
+            if ((payload.results || []).length > (bestPayload.results || []).length) {
+              bestPayload = payload;
+            }
+            if ((payload.results || []).length > 0) {
+              break;
+            }
+          }
+
+          if (!bestPayload.results.length && lastSearchError) {
+            throw lastSearchError;
+          }
+
+          const mapped = (bestPayload.results || []).map((item) => ({
+            // Search results can include chunk-level `id`; use `document_id` for detail expansion.
+            id: String(item.document_id || item.id || `${source}-${Math.random()}`),
             source,
             title: String(item.title || "Pa titull"),
             subtitle: String(item.text_preview || item.subtitle || ""),
             docType: String(item.doc_type || "Dokument"),
             date: "",
             score: typeof item.score === "number" ? Math.round(item.score) : undefined,
+            chunkId: typeof item.id === "string" ? item.id : undefined,
           }));
 
-          return { total: payload.total || mapped.length, mapped };
+          return { total: bestPayload.total || mapped.length, mapped };
         }
 
-        const response = await fetch(`/api/library?source=${encodeURIComponent(source)}&page=1&page_size=50`, {
+        const response = await fetch(`/api/library?source=${encodeURIComponent(source)}&page=1&page_size=${LIST_PAGE_SIZE}`, {
           headers: { Authorization: `Bearer ${jwtToken}` },
         });
         if (!response.ok) {
@@ -110,6 +179,8 @@ export default function LibraryPage() {
           subtitle: String(item.subtitle || ""),
           docType: String(item.doc_type || "Dokument"),
           date: String(item.date || ""),
+          score: undefined,
+          chunkId: undefined,
         }));
         return { total: payload.total || mapped.length, mapped };
       });
@@ -117,7 +188,31 @@ export default function LibraryPage() {
       const responses = await Promise.all(requests);
       const merged = responses.flatMap((r) => r.mapped);
       const mergedTotal = responses.reduce((acc, curr) => acc + curr.total, 0);
-      setResults(merged);
+
+      // Deduplicate by source+document ID because search can return many chunk-level
+      // hits for the same law/document, which would otherwise create duplicate React keys.
+      const dedupedByDocument = new Map<string, LibraryResult>();
+      for (const entry of merged) {
+        const dedupeKey = `${entry.source}-${entry.id}`;
+        const current = dedupedByDocument.get(dedupeKey);
+        if (!current) {
+          dedupedByDocument.set(dedupeKey, entry);
+          continue;
+        }
+
+        const currentScore = typeof current.score === "number" ? current.score : -1;
+        const nextScore = typeof entry.score === "number" ? entry.score : -1;
+        const pickNext =
+          nextScore > currentScore ||
+          (nextScore === currentScore && (entry.subtitle?.length || 0) > (current.subtitle?.length || 0));
+
+        if (pickNext) {
+          dedupedByDocument.set(dedupeKey, entry);
+        }
+      }
+
+      const dedupedResults = Array.from(dedupedByDocument.values());
+      setResults(dedupedResults);
       setTotalCount(mergedTotal);
     } catch (error) {
       console.error("Failed to load library results:", error);
@@ -148,6 +243,96 @@ export default function LibraryPage() {
     }),
     [results]
   );
+
+  useEffect(() => {
+    setExpandedItemKey(null);
+  }, [query, selectedSources, loading]);
+
+  const loadExpandedText = useCallback(async (item: LibraryResult, itemKey: string, options?: { prefetch?: boolean }) => {
+    const jwtToken = typeof window !== "undefined" ? localStorage.getItem("jwt_token") : null;
+    if (!jwtToken) return;
+
+    setLoadingItemKeys((prev) => ({ ...prev, [itemKey]: true }));
+    try {
+      const detailResponse = await fetch(
+        `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(item.id)}`,
+        { headers: { Authorization: `Bearer ${jwtToken}` } }
+      );
+
+      const detailPayload = detailResponse.ok
+        ? ((await detailResponse.json()) as Record<string, unknown>)
+        : null;
+
+      const assembledChunks: string[] = [];
+      const maxPages = options?.prefetch ? 4 : 50; // allow full-document expansion for large laws
+      const pageSize = 200;
+
+      for (let page = 1; page <= maxPages; page += 1) {
+        const chunkResponse = await fetch(
+          `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(item.id)}&mode=chunks&page=${page}&page_size=${pageSize}`,
+          { headers: { Authorization: `Bearer ${jwtToken}` } }
+        );
+        if (!chunkResponse.ok) break;
+
+        const chunkPayload = (await chunkResponse.json()) as { chunks?: Array<Record<string, unknown>> };
+        const pageChunks = chunkPayload.chunks || [];
+        if (pageChunks.length === 0) break;
+
+        for (const chunk of pageChunks) {
+          const sectionLabel = String(chunk.article_label || chunk.group_label || "").trim();
+          const sectionTitle = String(chunk.article_title || chunk.group_title || "").trim();
+          const rawText = String(
+            chunk.text ||
+            chunk.content ||
+            chunk.full_text ||
+            chunk.chunk_text ||
+            chunk.body ||
+            ""
+          ).trim();
+
+          if (!rawText) continue;
+          const heading = [sectionLabel, sectionTitle].filter(Boolean).join(" ");
+          assembledChunks.push(heading ? `${heading}\n${rawText}` : rawText);
+        }
+
+        if (pageChunks.length < pageSize) break;
+      }
+
+      const deduped = Array.from(new Set(assembledChunks.filter(Boolean)));
+      const fullTextFromChunks = deduped.join("\n\n");
+      const detailFallback = String(
+        detailPayload?.full_text ||
+        detailPayload?.content ||
+        detailPayload?.text ||
+        detailPayload?.subtitle ||
+        ""
+      ).trim();
+
+      const fullText = fullTextFromChunks || detailFallback || item.subtitle;
+      setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: fullText }));
+    } catch {
+      setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: item.subtitle }));
+    } finally {
+      setLoadingItemKeys((prev) => {
+        const next = { ...prev };
+        delete next[itemKey];
+        return next;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (results.length === 0) return;
+    const timer = setTimeout(() => {
+      results.slice(0, 2).forEach((item) => {
+        const itemKey = `${item.source}-${item.id}`;
+        if (expandedTextByItem[itemKey] || loadingItemKeys[itemKey]) return;
+        loadExpandedText(item, itemKey, { prefetch: true });
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [results, expandedTextByItem, loadingItemKeys, loadExpandedText]);
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -180,33 +365,33 @@ export default function LibraryPage() {
                   right: 0,
                 }}
               >
-              <TextField
-                fullWidth
-                placeholder="Kerko ne te gjitha bazat ligjore..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                slotProps={{
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <SearchIcon sx={{ color: "hsl(var(--text-muted))" }} />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 999,
-                    bgcolor: "hsl(var(--surface))",
-                  },
-                }}
-              />
+                <TextField
+                  fullWidth
+                  placeholder="Kerko ne te gjitha bazat ligjore..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <SearchIcon sx={{ color: "hsl(var(--text-muted))" }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 999,
+                      bgcolor: "hsl(var(--surface))",
+                    },
+                  }}
+                />
               </Box>
 
               <Paper
                 sx={{
                   p: 1.2,
-                  borderRadius: 2,
+                  borderRadius: 1,
                   position: "absolute",
                   top: { xs: 72, md: 84 },
                   left: 0,
@@ -242,7 +427,7 @@ export default function LibraryPage() {
                     }
                     label={
                       <Typography sx={{ fontSize: "0.86rem", color: "hsl(var(--text-primary))" }}>
-                        {filter.label} ({sourceCount[filter.key]})
+                        {filter.label}
                       </Typography>
                     }
                   />
@@ -273,15 +458,97 @@ export default function LibraryPage() {
                     <CircularProgress size={28} />
                   </Box>
                 ) : (
-                  <Box sx={{ display: "grid", gap: 1, overflowY: "auto", pr: 0.3, minHeight: 0, flex: 1 }}>
-                    {results.map((item) => (
-                      <Paper key={`${item.source}-${item.id}`} sx={{ p: 1.1, borderRadius: 1.8 }}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridAutoRows: "min-content",
+                      alignContent: "start",
+                      overflowY: "auto",
+                      pr: 0.3,
+                      minHeight: 0,
+                      flex: 1,
+                    }}
+                  >
+                    {results.map((item) => {
+                      const itemKey = `${item.source}-${item.id}`;
+                      const isExpanded = expandedItemKey === itemKey;
+                      const expandedText = expandedTextByItem[itemKey] || item.subtitle;
+                      return (
+                      <Paper
+                        key={itemKey}
+                        onMouseEnter={() => {
+                          if (!expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                            loadExpandedText(item, itemKey, { prefetch: true });
+                          }
+                        }}
+                        onClick={() => {
+                          setExpandedItemKey((prev) => {
+                            const next = prev === itemKey ? null : itemKey;
+                            if (next === itemKey && !expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                              loadExpandedText(item, itemKey);
+                            }
+                            return next;
+                          });
+                        }}
+                        sx={{
+                          p: 1.1,
+                          borderRadius: 1.8,
+                          cursor: "pointer",
+                          border: "1px solid hsl(var(--border-soft))",
+                          transition: "border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
+                          ...(isExpanded
+                            ? {
+                                borderColor: "hsl(var(--primary))",
+                                boxShadow: "0 0 0 1px hsl(var(--primary) / 0.15)",
+                              }
+                            : {
+                                "&:hover": {
+                                  borderColor: "hsl(var(--text-muted))",
+                                  backgroundColor: "hsl(var(--surface-muted))",
+                                },
+                              }),
+                        }}
+                      >
                         <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: "0.9rem", fontWeight: 600 }}>{item.title}</Typography>
+                            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.7 }}>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.9rem",
+                                  fontWeight: 600,
+                                  whiteSpace: isExpanded ? "normal" : "normal",
+                                  overflowWrap: "anywhere",
+                                  display: isExpanded ? "block" : "-webkit-box",
+                                  WebkitLineClamp: isExpanded ? "unset" : 3,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {item.title}
+                              </Typography>
+                              {loadingItemKeys[itemKey] ? <CircularProgress size={14} sx={{ color: "hsl(var(--text-muted))" }} /> : null}
+                            </Box>
                             {item.subtitle ? (
-                              <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))", mt: 0.3 }} noWrap>
-                                {item.subtitle}
+                              <Typography
+                                sx={{
+                                  fontSize: "0.8rem",
+                                  color: "hsl(var(--text-muted))",
+                                  mt: 0.3,
+                                  whiteSpace: isExpanded ? "pre-wrap" : "normal",
+                                  overflowWrap: "anywhere",
+                                  display: isExpanded ? "block" : "-webkit-box",
+                                  WebkitLineClamp: isExpanded ? "unset" : 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {isExpanded ? expandedText : item.subtitle}
+                              </Typography>
+                            ) : null}
+                            {isExpanded && loadingItemKeys[itemKey] ? (
+                              <Typography sx={{ mt: 0.35, fontSize: "0.76rem", color: "hsl(var(--text-muted))" }}>
+                                Po ngarkohet teksti i plote...
                               </Typography>
                             ) : null}
                             <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", mt: 0.45 }}>
@@ -295,7 +562,8 @@ export default function LibraryPage() {
                           ) : null}
                         </Box>
                       </Paper>
-                    ))}
+                      );
+                    })}
                   </Box>
                 )}
               </Box>

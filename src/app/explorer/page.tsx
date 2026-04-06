@@ -51,7 +51,8 @@ const SOURCE_OPTIONS: Array<{ id: SourceKey; label: string }> = [
   { id: "albanian", label: "Ligji Shqiptar" },
 ];
 
-const DECADE_OPTIONS = ["All years", "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", "1950s"];
+const EXPLORER_SEARCH_LIMIT = 50;
+const MIN_SEARCH_LENGTH = 3;
 
 export default function ExplorerPage() {
   const router = useRouter();
@@ -103,13 +104,33 @@ export default function ExplorerPage() {
 
     setLoading(true);
     try {
+      const trimmedQuery = query.trim();
+      const shouldSearch = trimmedQuery.length >= MIN_SEARCH_LENGTH;
+
       const url =
-        query.trim().length > 0
-          ? `/api/library?source=${encodeURIComponent(source)}&q=${encodeURIComponent(query.trim())}&limit=200`
+        shouldSearch
+          ? `/api/library?source=${encodeURIComponent(source)}&q=${encodeURIComponent(trimmedQuery)}&limit=${EXPLORER_SEARCH_LIMIT}`
           : `/api/library?source=${encodeURIComponent(source)}&page=1&page_size=200`;
 
       const response = await fetch(url, { headers: { Authorization: `Bearer ${jwtToken}` } });
       if (!response.ok) {
+        // Search endpoint can reject invalid/too-short query params. Fall back to list mode.
+        if (response.status === 422 && trimmedQuery.length > 0) {
+          const fallbackList = await fetch(
+            `/api/library?source=${encodeURIComponent(source)}&page=1&page_size=200`,
+            { headers: { Authorization: `Bearer ${jwtToken}` } }
+          );
+          if (fallbackList.ok) {
+            const payload = (await fallbackList.json()) as { documents: ExplorerDocument[]; total: number };
+            setDocuments(payload.documents || []);
+            setTotal(payload.total || (payload.documents || []).length);
+            if (!selectedId && (payload.documents || []).length > 0) {
+              setSelectedId(payload.documents[0].id);
+            }
+            return;
+          }
+        }
+
         if (requestedDocId) {
           const docRes = await fetch(
             `/api/library?source=${encodeURIComponent(source)}&doc_id=${encodeURIComponent(requestedDocId)}`,
@@ -135,7 +156,7 @@ export default function ExplorerPage() {
         throw new Error(`Explorer request failed: ${response.status}`);
       }
 
-      if (query.trim().length > 0) {
+      if (shouldSearch) {
         const payload = (await response.json()) as { results: Array<Record<string, unknown>>; total: number };
         const mapped = (payload.results || []).map((item) => ({
           id: String(item.document_id || item.id || ""),
@@ -280,17 +301,6 @@ export default function ExplorerPage() {
     }
   }, [searchParams, selectedChunks]);
 
-  const groupCounts = useMemo(() => {
-    const groups = new Map<string, number>();
-    documents.forEach((doc) => {
-      const g = (doc.doc_type || "D").toUpperCase();
-      groups.set(g, (groups.get(g) || 0) + 1);
-    });
-    return Array.from(groups.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 9);
-  }, [documents]);
-
   const filteredChunks = useMemo(() => {
     const q = chunkQuery.trim().toLowerCase();
     if (!q) return selectedChunks;
@@ -321,32 +331,6 @@ export default function ExplorerPage() {
                 Kthehu te Chat
               </Button>
               <Typography sx={{ fontSize: "1rem", fontWeight: 600 }}>Eksploro</Typography>
-            </Box>
-
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.65, mb: 1 }}>
-              <Chip
-                label={`All (${total.toLocaleString()})`}
-                color="primary"
-                variant="filled"
-                size="small"
-                sx={{ height: 26 }}
-              />
-              {groupCounts.map(([group, count]) => (
-                <Chip key={group} label={`${group} (${count.toLocaleString()})`} size="small" sx={{ height: 26 }} />
-              ))}
-            </Box>
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.65, mb: 1.1 }}>
-              {DECADE_OPTIONS.map((label, idx) => (
-                <Chip
-                  key={label}
-                  label={label}
-                  size="small"
-                  color={idx === 0 ? "primary" : "default"}
-                  variant={idx === 0 ? "filled" : "outlined"}
-                  sx={{ height: 24 }}
-                />
-              ))}
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 1.2, height: "calc(100dvh - 220px)" }}>

@@ -5,6 +5,8 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -79,11 +81,6 @@ export function MessageBubble({
       items: effectiveSources.slice(0, 8).map((source) => source),
     },
     {
-      key: "tables",
-      title: "Tabelat qe po perdoren",
-      items: reasoningSteps.filter((step) => /table|source|retriev|burim|dataset|dokument/i.test(step)),
-    },
-    {
       key: "filters",
       title: "Filtrat qe po aplikohen",
       items: reasoningSteps.filter((step) => /filter|scope|criteria|kriter|kusht/i.test(step)),
@@ -101,6 +98,14 @@ export function MessageBubble({
       ),
     },
   ].filter((group) => group.items.length > 0);
+
+  const reasoningRowAnimationSx = (index: number) => ({
+    opacity: 0,
+    transform: "translateX(-10px)",
+    animation: "reasoningRowSlideIn 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+    animationDelay: `${index * 45}ms`,
+    willChange: "transform, opacity",
+  });
 
   useEffect(() => {
     const fullText = sanitizeRenderedText(isExpanded ? fullContent : visiblePart);
@@ -193,15 +198,17 @@ export function MessageBubble({
           typeof window !== "undefined" && localStorage.getItem("selected_law") === "albanian" ? "albanian" : "eu_law";
         const label = selectedSource.label || "";
         const [docIdRaw, ...rest] = label.split(/\s+/);
-        const docId = docIdRaw?.trim();
-        const articleHint = rest.join(" ").trim().toLowerCase();
+        const cleanedDocId = (docIdRaw || "").replace(/^[^\w]+|[^\w]+$/g, "").trim();
+        const treatyDocId = (selectedSource.treaty || "").trim();
+        const articleHint = (selectedSource.article || rest.join(" ")).trim().toLowerCase();
+        const docIdHint = treatyDocId || cleanedDocId;
 
         const inferredSourceType =
-          selectedSource.sourceType === "eurlex" || /^\d{4}[A-Z]/i.test(docId || "") || /^(teu|tfeu)$/i.test(docId || "")
+          selectedSource.sourceType === "eurlex" || /^\d{4}[A-Z]/i.test(docIdHint || "") || /^(teu|tfeu)$/i.test(docIdHint || "")
             ? "eu_law"
             : selectedLawSource;
         const sourceCandidates = Array.from(
-          new Set<[string, ...string[]]>([
+          new Set<string>([
             inferredSourceType,
             inferredSourceType === "eu_law" ? "albanian" : "eu_law",
           ])
@@ -213,7 +220,7 @@ export function MessageBubble({
           .filter((token) => token.length > 1);
 
         for (const sourceType of sourceCandidates) {
-          let resolvedDocId = selectedSource.documentId || docId || "";
+          let resolvedDocId = selectedSource.documentId || treatyDocId || cleanedDocId || "";
 
           // Always try search first to resolve canonical document IDs.
           const searchResult = await fetchWithAuthRetry(
@@ -227,7 +234,7 @@ export function MessageBubble({
             const results = searchJson.results || [];
             const matched = results.find((item) => {
               const candidateId = String(item.document_id || item.id || "");
-              return docId ? candidateId.toLowerCase().includes(docId.toLowerCase()) : Boolean(candidateId);
+              return docIdHint ? candidateId.toLowerCase().includes(docIdHint.toLowerCase()) : Boolean(candidateId);
             });
             const firstResult = matched || results[0];
             const candidate = firstResult?.document_id || firstResult?.id;
@@ -270,7 +277,17 @@ export function MessageBubble({
             }) || chunks[0];
 
           const bestText =
-            (matchedChunk && (String(matchedChunk.text || matchedChunk.text_preview || "").trim() || null)) ||
+            (matchedChunk && (
+              String(
+                matchedChunk.text ||
+                matchedChunk.content ||
+                matchedChunk.chunk_text ||
+                matchedChunk.body ||
+                matchedChunk.full_text ||
+                matchedChunk.text_preview ||
+                ""
+              ).trim() || null
+            )) ||
             (detailJson && String(detailJson.subtitle || detailJson.title || "").trim()) ||
             selectedSource.textPreview ||
             null;
@@ -325,41 +342,97 @@ export function MessageBubble({
             Hapat e arsyetimit
           </Button>
           {showReasoning && (
-            <Box sx={{ mt: 0.6, pl: 0.3, display: "grid", gap: 1 }}>
+            <Box sx={{ mt: 0.8, display: "grid", gap: 1.5 }}>
               {groupedReasoning.map((group) => (
                 <Box key={group.key}>
-                  <Typography sx={{ fontSize: "1rem", fontWeight: 700, color: "hsl(var(--text-primary))", mb: 0.5 }}>
-                    {group.title}
-                  </Typography>
-                  <Box sx={{ display: "grid", gap: 0.55 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 0.7 }}>
+                    <CheckCircleRoundedIcon
+                      sx={{
+                        fontSize: 16,
+                        color: "hsl(var(--text-muted))",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography sx={{ fontSize: "1.05rem", fontWeight: 700, color: "hsl(var(--text-primary))", lineHeight: 1.2 }}>
+                      {group.title}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 0.6,
+                      pl: 3.0,
+                      "@keyframes reasoningRowSlideIn": {
+                        from: { opacity: 0, transform: "translateX(-10px)" },
+                        to: { opacity: 1, transform: "translateX(0)" },
+                      },
+                    }}
+                  >
                     {group.key === "sources"
                       ? (group.items as ChatSource[]).map((source, idx) => (
-                          <Button
-                            key={`${source.label}-${idx}`}
-                            onClick={() => setSelectedSource(source)}
+                        <Button
+                          key={`${source.label}-${idx}`}
+                          onClick={() => setSelectedSource(source)}
+                          sx={{
+                            justifyContent: "flex-start",
+                            gap: 0.75,
+                            minWidth: "auto",
+                            px: 0,
+                            py: 0.1,
+                            textTransform: "none",
+                            color: "hsl(var(--text-muted))",
+                            "&:hover": { bgcolor: "transparent", color: "hsl(var(--text-primary))" },
+                              ...reasoningRowAnimationSx(idx),
+                          }}
+                        >
+                          <Box
                             sx={{
-                              justifyContent: "flex-start",
-                              gap: 0.7,
-                              minWidth: "auto",
-                              px: 0.2,
-                              py: 0.15,
-                              textTransform: "none",
-                              color: "hsl(var(--text-muted))",
-                              "&:hover": { bgcolor: "transparent", color: "hsl(var(--text-primary))" },
+                              width: 18,
+                              height: 18,
+                                borderRadius: "4px",
+                              border: "1px solid hsl(var(--border-soft))",
+                              bgcolor: "hsl(var(--surface-muted))",
+                              display: "grid",
+                              placeItems: "center",
+                              flexShrink: 0,
                             }}
                           >
-                            <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: "hsl(var(--primary))", flexShrink: 0 }} />
-                            <Typography sx={{ fontSize: "0.9rem" }}>
-                              {source.treaty && source.article ? `[${source.treaty}] ${source.article}` : source.label}
-                            </Typography>
-                          </Button>
-                        ))
-                      : (group.items as string[]).map((step, idx) => (
-                          <Box key={`${group.key}-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 0.7 }}>
-                            <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: isTyping ? "hsl(var(--text-muted))" : "hsl(var(--primary))" }} />
-                            <Typography sx={{ fontSize: "0.9rem", color: "hsl(var(--text-muted))" }}>{step}</Typography>
+                            <LinkRoundedIcon sx={{ fontSize: 12, color: "hsl(var(--text-muted))" }} />
                           </Box>
-                        ))}
+                          <Typography sx={{ fontSize: "0.83rem", letterSpacing: "0.01em" }}>
+                            {source.treaty && source.article ? `[${source.treaty}] ${source.article}` : source.label}
+                          </Typography>
+                        </Button>
+                      ))
+                      : (group.items as string[]).map((step, idx) => (
+                          <Box
+                            key={`${group.key}-${idx}`}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.75,
+                              ...reasoningRowAnimationSx(idx),
+                            }}
+                          >
+                          <Box
+                            sx={{
+                              width: 18,
+                              height: 18,
+                                borderRadius: "4px",
+                              border: "1px solid hsl(var(--border-soft))",
+                              bgcolor: "hsl(var(--surface-muted))",
+                              display: "grid",
+                              placeItems: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <LinkRoundedIcon sx={{ fontSize: 12, color: "hsl(var(--text-muted))" }} />
+                          </Box>
+                          <Typography sx={{ fontSize: "0.83rem", color: "hsl(var(--text-muted))", letterSpacing: "0.01em" }}>
+                            {step}
+                          </Typography>
+                        </Box>
+                      ))}
                   </Box>
                 </Box>
               ))}
