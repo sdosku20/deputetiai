@@ -9,6 +9,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { devError, devLog, devWarn } from "@/lib/utils/logger";
 
 interface User {
   id: string;
@@ -56,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Silently attempt to get JWT token in background (non-blocking)
     const attemptLogin = async () => {
       try {
-        console.log('[AuthContext] Attempting login through local proxy: /api/auth/login');
+        devLog('[AuthContext] Attempting login through local proxy: /api/auth/login');
         
         const response = await fetch(`/api/auth/login`, {
           method: 'POST',
@@ -69,26 +70,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }),
         });
 
-        console.log('[AuthContext] Login response status:', response.status, response.statusText);
+        devLog('[AuthContext] Login response status:', response.status, response.statusText);
 
         if (response.ok) {
           const data = await response.json();
-          console.log('[AuthContext] Login response data:', data);
+          devLog('[AuthContext] Login response data:', data);
           if (data.access_token || data.token) {
             const token = data.access_token || data.token;
             localStorage.setItem('jwt_token', token);
             window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
-            console.log('[AuthContext] ✓ Background login successful, JWT token stored');
+            devLog('[AuthContext] ✓ Background login successful, JWT token stored');
           } else {
-            console.warn('[AuthContext] ⚠️ Login response missing token:', data);
+            devWarn('[AuthContext] ⚠️ Login response missing token:', data);
           }
         } else {
           const errorText = await response.text();
-          console.error('[AuthContext] ❌ Login failed:', response.status, errorText);
+          devError('[AuthContext] ❌ Login failed:', response.status, errorText);
         }
       } catch (err: any) {
         // Log error details for debugging
-        console.error('[AuthContext] ❌ Background login error:', {
+        devError('[AuthContext] ❌ Background login error:', {
           message: err.message,
           stack: err.stack,
           name: err.name,
@@ -136,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.removeItem(`chat_session_${session.session_id}`);
           });
         } catch (e) {
-          console.error('Error clearing chat sessions:', e);
+          devError('Error clearing chat sessions:', e);
         }
       }
       localStorage.removeItem('chat_sessions_list');
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Silently refresh JWT token in background
     const attemptLogin = async () => {
       try {
-        console.log('[AuthContext] Refreshing JWT token...');
+        devLog('[AuthContext] Refreshing JWT token...');
         const response = await fetch(`/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -158,13 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.access_token || data.token) {
             localStorage.setItem('jwt_token', data.access_token || data.token);
             window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
-            console.log('[AuthContext] ✓ JWT token refreshed');
+            devLog('[AuthContext] ✓ JWT token refreshed');
           }
         } else {
-          console.warn('[AuthContext] ⚠️ Token refresh failed:', response.status);
+          devWarn('[AuthContext] ⚠️ Token refresh failed:', response.status);
         }
       } catch (err) {
-        console.error('[AuthContext] ❌ Token refresh error:', err);
+        devError('[AuthContext] ❌ Token refresh error:', err);
       }
     };
     attemptLogin();

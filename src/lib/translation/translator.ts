@@ -34,6 +34,7 @@
  * If issues arise, switch to Google Cloud Translation API (recommended) or OpenAI.
  */
 
+import { devError, devLog } from "@/lib/utils/logger";
 const GOOGLE_TRANSLATE_API = 'https://translate.googleapis.com/translate_a/single';
 
 /**
@@ -201,7 +202,7 @@ async function translateText(text: string, fromLang: string, toLang: string): Pr
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.error('[Translation] API request failed:', response.status, response.statusText);
+      devError('[Translation] API request failed:', response.status, response.statusText);
       // Fallback: return original text if translation fails
       return text;
     }
@@ -220,7 +221,7 @@ async function translateText(text: string, fromLang: string, toLang: string): Pr
     
     return text;
   } catch (error) {
-    console.error('[Translation] Error translating text:', error);
+    devError('[Translation] Error translating text:', error);
     // Fallback: return original text if translation fails
     return text;
   }
@@ -239,9 +240,9 @@ export async function translateToEnglish(text: string): Promise<string> {
     return text;
   }
 
-  console.log('[Translation] Translating Albanian to English:', text.substring(0, 50));
+  devLog('[Translation] Translating Albanian to English:', text.substring(0, 50));
   const translated = await translateText(text, 'sq', 'en');
-  console.log('[Translation] Translated result:', translated.substring(0, 50));
+  devLog('[Translation] Translated result:', translated.substring(0, 50));
   return translated;
 }
 
@@ -254,7 +255,7 @@ export async function translateToAlbanian(text: string): Promise<string> {
     return text;
   }
 
-  console.log('[Translation] Translating English to Albanian:', text.substring(0, 50));
+  devLog('[Translation] Translating English to Albanian:', text.substring(0, 50));
   let translated = await translateText(text, 'en', 'sq');
   
   // ALWAYS remove unwanted conversational prefixes - backend never uses them
@@ -268,7 +269,7 @@ export async function translateToAlbanian(text: string): Promise<string> {
   translated = translated.replace(/^Yes\s+/i, '');
   translated = translated.replace(/^Yes,\s+/i, '');
   
-  console.log('[Translation] Translated result (cleaned):', translated.substring(0, 50));
+  devLog('[Translation] Translated result (cleaned):', translated.substring(0, 50));
   return translated;
 }
 

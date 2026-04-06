@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { chatClient, ChatMessage, ChatResponse } from "@/lib/api/client";
 import type { ChatSource } from "@/lib/api/client";
+import { devError, devLog, devWarn } from "@/lib/utils/logger";
 
 export interface AgentMessage {
   role: "user" | "assistant";
@@ -56,7 +57,7 @@ export function useAgentSession(sessionId: string | null = null) {
       // Use provided sessionId or fall back to the hook's sessionId
       const activeSessionId = overrideSessionId || sessionId || "default";
       
-      console.log("[useAgentSession] Sending message:", {
+      devLog("[useAgentSession] Sending message:", {
         message: userMessage.substring(0, 50),
         activeSessionId,
         overrideSessionId,
@@ -112,7 +113,7 @@ export function useAgentSession(sessionId: string | null = null) {
             // Dispatch event to refresh UI
             window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
           } catch (saveError) {
-            console.error('[useAgentSession] Error saving user message:', saveError);
+            devError('[useAgentSession] Error saving user message:', saveError);
           }
         }
         
@@ -127,13 +128,13 @@ export function useAgentSession(sessionId: string | null = null) {
                  !content.includes('request failed');
         });
         
-        console.log('[useAgentSession] Conversation history (raw):', conversationHistory);
-        console.log('[useAgentSession] Conversation history (cleaned):', cleanHistory);
+        devLog('[useAgentSession] Conversation history (raw):', conversationHistory);
+        devLog('[useAgentSession] Conversation history (cleaned):', cleanHistory);
         
         // Send to chat API with cleaned conversation history for context
         const response = await chatClient.sendMessage(userMessage, activeSessionId, cleanHistory);
 
-        console.log("[useAgentSession] Response received:", {
+        devLog("[useAgentSession] Response received:", {
           success: response?.success,
           hasResponse: !!response?.response,
           error: response?.error
@@ -160,7 +161,7 @@ export function useAgentSession(sessionId: string | null = null) {
         } else {
           // Backend responded but indicated failure
           const errorDetails = response?.error ? String(response.error) : 'Unknown error';
-          console.error("[useAgentSession] ❌ Backend indicated failure:", {
+          devError("[useAgentSession] ❌ Backend indicated failure:", {
             success: response?.success,
             hasResponse: !!response?.response,
             error: errorDetails
@@ -208,7 +209,7 @@ export function useAgentSession(sessionId: string | null = null) {
               localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
               window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
             } catch (saveError) {
-              console.error('[useAgentSession] Error saving error message:', saveError);
+              devError('[useAgentSession] Error saving error message:', saveError);
             }
           }
           
@@ -217,7 +218,7 @@ export function useAgentSession(sessionId: string | null = null) {
           return null;
         }
       } catch (err) {
-        console.error("[useAgentSession] Request failed:", err);
+        devError("[useAgentSession] Request failed:", err);
         
         const errorMsg: AgentMessage = {
           role: "assistant",
@@ -257,7 +258,7 @@ export function useAgentSession(sessionId: string | null = null) {
             localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
             window.dispatchEvent(new CustomEvent('sessionUpdated', { detail: { sessionId: activeSessionId } }));
           } catch (saveError) {
-            console.error('[useAgentSession] Error saving exception message:', saveError);
+            devError('[useAgentSession] Error saving exception message:', saveError);
           }
         }
         
@@ -275,7 +276,7 @@ export function useAgentSession(sessionId: string | null = null) {
 
   const deleteConversation = useCallback(async () => {
     if (!sessionId) {
-      console.warn("Cannot delete conversation: no session ID");
+      devWarn("Cannot delete conversation: no session ID");
       return;
     }
     
@@ -284,7 +285,7 @@ export function useAgentSession(sessionId: string | null = null) {
       chatClient.deleteConversation(sessionId);
       setMessages([]);
     } catch (error) {
-      console.error("Failed to delete conversation:", error);
+      devError("Failed to delete conversation:", error);
       setError("Failed to delete conversation");
     }
   }, [sessionId]);

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { chatClient } from "@/lib/api/client";
+import { devError, devLog } from "@/lib/utils/logger";
 
 export interface ConversationSession {
   session_id: string;
@@ -24,10 +25,10 @@ export function useConversationSessions() {
       setError(null);
       
       const sessionsList = chatClient.getConversationSessions();
-      console.log(`[useConversationSessions] Loaded ${sessionsList.length} sessions from localStorage`);
+      devLog(`[useConversationSessions] Loaded ${sessionsList.length} sessions from localStorage`);
       setSessions(sessionsList);
     } catch (err) {
-      console.error("Failed to load conversation sessions:", err);
+      devError("Failed to load conversation sessions:", err);
       setError("Failed to load conversations");
       setSessions([]);
     } finally {
@@ -43,19 +44,19 @@ export function useConversationSessions() {
   // Listen for conversation events and refresh
   useEffect(() => {
     const handleConversationCreated = () => {
-      console.log("[useConversationSessions] New conversation created, refreshing list...");
+      devLog("[useConversationSessions] New conversation created, refreshing list...");
       loadSessions();
     };
 
     const handleSessionUpdated = () => {
-      console.log("[useConversationSessions] Session updated, refreshing list...");
+      devLog("[useConversationSessions] Session updated, refreshing list...");
       loadSessions();
     };
 
     // Refresh on visibility change (when user comes back to tab)
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("[useConversationSessions] Tab visible, refreshing sessions...");
+        devLog("[useConversationSessions] Tab visible, refreshing sessions...");
         loadSessions();
       }
     };
@@ -81,7 +82,7 @@ export function useConversationSessions() {
         setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
         return true;
       } catch (err) {
-        console.error("Failed to delete conversation:", err);
+        devError("Failed to delete conversation:", err);
         setError("Failed to delete conversation");
         return false;
       }

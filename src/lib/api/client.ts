@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { devError, devLog, devWarn } from '@/lib/utils/logger';
 // ALL TRANSLATION DISABLED - Backend handles everything
 // No language detection, no system messages, no translation from frontend
 
@@ -8,7 +9,7 @@ let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.a
 
 // Force correct endpoint - remove any hash routes or old endpoints
 if (API_BASE_URL.includes('asistenti.deputeti.ai')) {
-  console.warn('[API Config] ⚠️ Detected old endpoint, forcing to eu-law.deputeti.ai');
+  devWarn('[API Config] ⚠️ Detected old endpoint, forcing to eu-law.deputeti.ai');
   API_BASE_URL = 'https://eu-law.deputeti.ai';
 }
 // Remove hash routes if accidentally included (they're frontend routes, not API)
@@ -23,10 +24,10 @@ const DEFAULT_MODEL = process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
 if (typeof window !== 'undefined') {
   // Warn if old endpoint is detected
   if (API_BASE_URL.includes('asistenti.deputeti.ai')) {
-    console.error('[API Config] ⚠️ WARNING: Using old endpoint! Please set NEXT_PUBLIC_API_URL=https://eu-law.deputeti.ai');
+    devError('[API Config] ⚠️ WARNING: Using old endpoint! Please set NEXT_PUBLIC_API_URL=https://eu-law.deputeti.ai');
   }
 
-  console.log('[API Config] Environment check:', {
+  devLog('[API Config] Environment check:', {
     API_BASE_URL,
     DEFAULT_MODEL,
     env_API_URL: process.env.NEXT_PUBLIC_API_URL,
@@ -69,7 +70,7 @@ class APIClient {
         }
 
         const fullUrl = `${config.baseURL}${config.url}`;
-        console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${fullUrl}`);
+        devLog(`[API Client] 📤 ${config.method?.toUpperCase()} ${fullUrl}`);
 
         // Log the actual data that will be sent
         const requestDataForLog = config.data;
@@ -77,7 +78,7 @@ class APIClient {
           ? requestDataForLog
           : JSON.stringify(requestDataForLog);
 
-        console.log('[API Client] Request config:', {
+        devLog('[API Client] Request config:', {
           fullUrl: fullUrl,
           baseURL: config.baseURL,
           url: config.url,
@@ -95,17 +96,17 @@ class APIClient {
         // Use JWT Bearer token if available
         if (jwtToken) {
           config.headers['Authorization'] = `Bearer ${jwtToken}`;
-          console.log('[API Client] ✓ Added Authorization Bearer token');
+          devLog('[API Client] ✓ Added Authorization Bearer token');
         }
 
         if (!jwtToken) {
-          console.warn('[API Client] ⚠️ No JWT token found');
+          devWarn('[API Client] ⚠️ No JWT token found');
         }
 
         return config;
       },
       (error) => {
-        console.error('[API Client] ❌ Request interceptor error:', error);
+        devError('[API Client] ❌ Request interceptor error:', error);
         return Promise.reject(error);
       }
     );
@@ -113,7 +114,7 @@ class APIClient {
     // Response interceptor - handle errors and token refresh
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+        devLog(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
 
         return response;
       },
@@ -123,7 +124,7 @@ class APIClient {
         const url = error.config?.url;
         const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
 
-        console.error(`[API Client] ❌ ${status} ${method} ${fullUrl}`);
+        devError(`[API Client] ❌ ${status} ${method} ${fullUrl}`);
 
         // Better error logging - extract data properly
         const responseData = error.response?.data;
@@ -132,7 +133,7 @@ class APIClient {
           : 'No response data';
 
         // Log comprehensive error details
-        console.error('[API Client] Error details:', {
+        devError('[API Client] Error details:', {
           errorCode: error.code,
           errorMessage: error.message,
           status: error.response?.status,
@@ -149,12 +150,12 @@ class APIClient {
 
         // Log full error response for 500 errors
         if (error.response?.status === 500) {
-          console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
+          devError('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
         }
 
         // Handle 401 Unauthorized - token might be expired, try to refresh
         if (error.response?.status === 401) {
-          console.warn('[API Client] ⚠️ 401 Unauthorized - token may be expired, attempting to refresh...');
+          devWarn('[API Client] ⚠️ 401 Unauthorized - token may be expired, attempting to refresh...');
 
           // Clear old token
           if (typeof window !== 'undefined') {
@@ -168,11 +169,11 @@ class APIClient {
               if (newToken && error.config) {
                 // Retry the original request with new token
                 error.config.headers['Authorization'] = `Bearer ${newToken}`;
-                console.log('[API Client] ✓ Retrying request with new token');
+                devLog('[API Client] ✓ Retrying request with new token');
                 return self.client.request(error.config);
               }
             } catch (refreshError) {
-              console.error('[API Client] ❌ Failed to refresh token:', refreshError);
+              devError('[API Client] ❌ Failed to refresh token:', refreshError);
             }
           }
         }
@@ -180,16 +181,16 @@ class APIClient {
         // Enhanced: Export error details in copyable format for debugging
         // Handle network errors and timeouts gracefully
         if (error.code === 'ECONNABORTED') {
-          console.error('[API Client] ⚠️ Request timeout - server may be processing');
+          devError('[API Client] ⚠️ Request timeout - server may be processing');
         } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-          console.error('[API Client] ⚠️ Network error - Possible causes:');
-          console.error('  1. CORS issue - server may not allow requests from this origin');
-          console.error('  2. Server is down or unreachable');
-          console.error('  3. SSL/certificate issue');
-          console.error('  4. Endpoint does not exist:', fullUrl);
-          console.error('  5. Check browser console Network tab for more details');
+          devError('[API Client] ⚠️ Network error - Possible causes:');
+          devError('  1. CORS issue - server may not allow requests from this origin');
+          devError('  2. Server is down or unreachable');
+          devError('  3. SSL/certificate issue');
+          devError('  4. Endpoint does not exist:', fullUrl);
+          devError('  5. Check browser console Network tab for more details');
         } else if (error.code === 'ERR_CERT_AUTHORITY_INVALID' || error.code === 'ERR_SSL_PROTOCOL_ERROR') {
-          console.error('[API Client] ⚠️ SSL/Certificate error - server certificate may be invalid');
+          devError('[API Client] ⚠️ SSL/Certificate error - server certificate may be invalid');
         }
 
         return Promise.reject(error);
@@ -205,7 +206,7 @@ class APIClient {
 
     // If no token, try to login
     if (!jwtToken) {
-      console.log('[API Client] No JWT token found, attempting login...');
+      devLog('[API Client] No JWT token found, attempting login...');
       try {
         const loginResponse = await fetch(`/api/auth/login`, {
           method: 'POST',
@@ -222,16 +223,16 @@ class APIClient {
           if (jwtToken) {
             localStorage.setItem('jwt_token', jwtToken);
             window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
-            console.log('[API Client] ✓ Login successful, JWT token obtained');
+            devLog('[API Client] ✓ Login successful, JWT token obtained');
           } else {
-            console.error('[API Client] ❌ Login response missing token:', loginData);
+            devError('[API Client] ❌ Login response missing token:', loginData);
           }
         } else {
           const errorText = await loginResponse.text();
-          console.error('[API Client] ❌ Login failed:', loginResponse.status, errorText);
+          devError('[API Client] ❌ Login failed:', loginResponse.status, errorText);
         }
       } catch (loginError) {
-        console.error('[API Client] ❌ Login error:', loginError);
+        devError('[API Client] ❌ Login error:', loginError);
       }
     }
 
@@ -486,7 +487,7 @@ class ChatAPIClient {
           return conversation.id;
         }
       } catch (error) {
-        console.warn('[ChatAPI] Conversation not found, creating new one:', error);
+        devWarn('[ChatAPI] Conversation not found, creating new one:', error);
       }
     }
 
@@ -496,10 +497,10 @@ class ChatAPIClient {
         title: 'Bisede e re',
         profile: 'general',
       });
-      console.log('[ChatAPI] Created new conversation:', response.id);
+      devLog('[ChatAPI] Created new conversation:', response.id);
       return response.id;
     } catch (error: any) {
-      console.error('[ChatAPI] Failed to create conversation:', error);
+      devError('[ChatAPI] Failed to create conversation:', error);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to create conversation';
       throw new Error(errorMessage);
     }
@@ -529,10 +530,10 @@ class ChatAPIClient {
 
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
-      console.log('[ChatAPI] 📤 Sending request to local proxy:', '/api/chat');
-      console.log('[ChatAPI] User message:', userMessage.substring(0, 80));
-      console.log('[ChatAPI] Request body (JSON):', requestBodyJson);
-      console.log('[ChatAPI] Request details:', {
+      devLog('[ChatAPI] 📤 Sending request to local proxy:', '/api/chat');
+      devLog('[ChatAPI] User message:', userMessage.substring(0, 80));
+      devLog('[ChatAPI] Request body (JSON):', requestBodyJson);
+      devLog('[ChatAPI] Request details:', {
         messageCount: messages.length,
         messagePreview: userMessage.substring(0, 80),
         source,
@@ -625,7 +626,7 @@ class ChatAPIClient {
         ? tailRefMatch[1].slice(0, 8)
         : normalizedId.slice(0, 8) || '';
 
-      console.log('[ChatAPI] Response received:', {
+      devLog('[ChatAPI] Response received:', {
         status: 'success',
         rawId,
         refId,
@@ -639,7 +640,7 @@ class ChatAPIClient {
       const assistantMessage = response.choices?.[0]?.message?.content || '';
 
       if (!assistantMessage) {
-        console.error('[ChatAPI] No assistant message in response:', response);
+        devError('[ChatAPI] No assistant message in response:', response);
         return {
           success: false,
           response: '',
@@ -653,7 +654,7 @@ class ChatAPIClient {
         : assistantMessage;
       const sources = this.extractSources(response.sources, assistantMessage);
       const reasoningSteps = this.extractReasoningSteps(response.metadata, assistantMessage, sources.length);
-      console.log('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
+      devLog('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
 
       // Store conversation in localStorage for session management
       const updatedMessages: ChatMessage[] = [
@@ -694,7 +695,7 @@ class ChatAPIClient {
         : 'No request data';
 
       // Comprehensive error logging
-      console.error('[ChatAPI] ❌ Error sending message:', {
+      devError('[ChatAPI] ❌ Error sending message:', {
         errorCode: errorCode,
         errorMessage: errorMessage,
         status: errorStatus,
@@ -713,12 +714,12 @@ class ChatAPIClient {
 
       // Special handling for network errors
       if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
-        console.error('[ChatAPI] 🔍 Network Error Diagnosis:');
-        console.error('  1. Check if endpoint exists:', fullUrl);
-        console.error('  2. Check browser Network tab for CORS errors');
-        console.error('  3. Verify server is reachable');
-        console.error('  4. Check if SSL certificate is valid');
-        console.error('  5. Try opening the URL directly in browser:', fullUrl);
+        devError('[ChatAPI] 🔍 Network Error Diagnosis:');
+        devError('  1. Check if endpoint exists:', fullUrl);
+        devError('  2. Check browser Network tab for CORS errors');
+        devError('  3. Verify server is reachable');
+        devError('  4. Check if SSL certificate is valid');
+        devError('  5. Try opening the URL directly in browser:', fullUrl);
       }
 
       // Build a production-safe user message (avoid leaking endpoint URLs/internal details)
@@ -740,11 +741,11 @@ class ChatAPIClient {
 
       // If we got a 500 error with RAG pipeline error, show it clearly
       if (errorStatus === 500 && userErrorMessage.includes('RAG')) {
-        console.error('[ChatAPI] ⚠️ RAG Pipeline Error detected!');
-        console.error('[ChatAPI] This suggests the backend received data in an unexpected format.');
-        console.error('[ChatAPI] Error response:', errorDataStr);
-        console.error('[ChatAPI] What we sent:', requestDataStr);
-        console.error('[ChatAPI] Expected format (from working website):', JSON.stringify({
+        devError('[ChatAPI] ⚠️ RAG Pipeline Error detected!');
+        devError('[ChatAPI] This suggests the backend received data in an unexpected format.');
+        devError('[ChatAPI] Error response:', errorDataStr);
+        devError('[ChatAPI] What we sent:', requestDataStr);
+        devError('[ChatAPI] Expected format (from working website):', JSON.stringify({
           content: "What is Article 50 TEU?"
         }, null, 2));
       }
@@ -794,7 +795,7 @@ class ChatAPIClient {
         })
         .filter((msg) => msg.role && msg.content);
     } catch (error) {
-      console.error('[ChatAPI] Error loading conversation history:', error);
+      devError('[ChatAPI] Error loading conversation history:', error);
       return [];
     }
   }
@@ -818,7 +819,7 @@ class ChatAPIClient {
       // Update session list
       this.updateSessionList(sessionId);
     } catch (error) {
-      console.error('[ChatAPI] Error saving session messages:', error);
+      devError('[ChatAPI] Error saving session messages:', error);
     }
   }
 
@@ -842,7 +843,7 @@ class ChatAPIClient {
         new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
       );
     } catch (error) {
-      console.error('[ChatAPI] Error loading sessions list:', error);
+      devError('[ChatAPI] Error loading sessions list:', error);
       return [];
     }
   }
@@ -856,7 +857,7 @@ class ChatAPIClient {
     try {
       const stored = localStorage.getItem(`chat_session_${sessionId}`);
       if (!stored) {
-        console.warn(`[ChatAPI] No session found for ${sessionId}, cannot update list`);
+        devWarn(`[ChatAPI] No session found for ${sessionId}, cannot update list`);
         return;
       }
 
@@ -879,9 +880,9 @@ class ChatAPIClient {
       });
 
       localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
-      console.log(`[ChatAPI] Updated sessions list. Total sessions: ${sessions.length}`);
+      devLog(`[ChatAPI] Updated sessions list. Total sessions: ${sessions.length}`);
     } catch (error) {
-      console.error('[ChatAPI] Error updating sessions list:', error);
+      devError('[ChatAPI] Error updating sessions list:', error);
     }
   }
 
@@ -902,7 +903,7 @@ class ChatAPIClient {
         localStorage.setItem('chat_sessions_list', JSON.stringify(updated));
       }
     } catch (error) {
-      console.error('[ChatAPI] Error deleting session:', error);
+      devError('[ChatAPI] Error deleting session:', error);
     }
   }
 }
