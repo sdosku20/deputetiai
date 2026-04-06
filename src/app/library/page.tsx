@@ -27,6 +27,7 @@ interface SourceFilter {
 
 interface LibraryResult {
   id: string;
+  documentId?: string;
   source: SourceKey;
   title: string;
   subtitle: string;
@@ -150,9 +151,12 @@ export default function LibraryPage() {
             throw lastSearchError;
           }
 
-          const mapped = (bestPayload.results || []).map((item, idx) => ({
+          const mapped = (bestPayload.results || []).map((item, idx) => {
+            const documentId = String(item.document_id || item.doc_id || item.id || "").trim();
+            return {
             // Search results can include chunk-level `id`; use `document_id` for detail expansion.
             id: String(item.document_id || item.id || `${source}-search-${idx}`),
+            documentId: documentId || undefined,
             source,
             title: String(item.title || "Pa titull"),
             subtitle: String(item.text_preview || item.subtitle || ""),
@@ -160,7 +164,7 @@ export default function LibraryPage() {
             date: "",
             score: typeof item.score === "number" ? Math.round(item.score) : undefined,
             chunkId: typeof item.id === "string" ? item.id : undefined,
-          }));
+          }});
 
           return { total: bestPayload.total || mapped.length, mapped };
         }
@@ -174,6 +178,7 @@ export default function LibraryPage() {
         const payload = (await response.json()) as { documents: Array<Record<string, unknown>>; total: number };
         const mapped = (payload.documents || []).map((item, idx) => ({
           id: String(item.id || `${source}-list-${idx}`),
+          documentId: typeof item.id === "string" ? item.id : undefined,
           source,
           title: String(item.title || "Pa titull"),
           subtitle: String(item.subtitle || ""),
@@ -193,7 +198,7 @@ export default function LibraryPage() {
       // hits for the same law/document, which would otherwise create duplicate React keys.
       const dedupedByDocument = new Map<string, LibraryResult>();
       for (const entry of merged) {
-        const dedupeKey = `${entry.source}-${entry.id}`;
+        const dedupeKey = `${entry.source}-${entry.documentId || entry.id}`;
         const current = dedupedByDocument.get(dedupeKey);
         if (!current) {
           dedupedByDocument.set(dedupeKey, entry);
@@ -254,61 +259,88 @@ export default function LibraryPage() {
 
     setLoadingItemKeys((prev) => ({ ...prev, [itemKey]: true }));
     try {
-      const detailResponse = await fetch(
-        `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(item.id)}`,
-        { headers: { Authorization: `Bearer ${jwtToken}` } }
-      );
-
-      const detailPayload = detailResponse.ok
-        ? ((await detailResponse.json()) as Record<string, unknown>)
-        : null;
-
-      const assembledChunks: string[] = [];
       const maxPages = options?.prefetch ? 4 : 50; // allow full-document expansion for large laws
       const pageSize = 200;
-
-      for (let page = 1; page <= maxPages; page += 1) {
-        const chunkResponse = await fetch(
-          `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(item.id)}&mode=chunks&page=${page}&page_size=${pageSize}`,
+      const fetchByDocId = async (docId: string) => {
+        const detailResponse = await fetch(
+          `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(docId)}`,
           { headers: { Authorization: `Bearer ${jwtToken}` } }
         );
-        if (!chunkResponse.ok) break;
+        const detailPayload = detailResponse.ok
+          ? ((await detailResponse.json()) as Record<string, unknown>)
+          : null;
 
-        const chunkPayload = (await chunkResponse.json()) as { chunks?: Array<Record<string, unknown>> };
-        const pageChunks = chunkPayload.chunks || [];
-        if (pageChunks.length === 0) break;
+        const assembledChunks: string[] = [];
+        for (let page = 1; page <= maxPages; page += 1) {
+          const chunkResponse = await fetch(
+            `/api/library?source=${encodeURIComponent(item.source)}&doc_id=${encodeURIComponent(docId)}&mode=chunks&page=${page}&page_size=${pageSize}`,
+            { headers: { Authorization: `Bearer ${jwtToken}` } }
+          );
+          if (!chunkResponse.ok) break;
 
-        for (const chunk of pageChunks) {
-          const sectionLabel = String(chunk.article_label || chunk.group_label || "").trim();
-          const sectionTitle = String(chunk.article_title || chunk.group_title || "").trim();
-          const rawText = String(
-            chunk.text ||
-            chunk.content ||
-            chunk.full_text ||
-            chunk.chunk_text ||
-            chunk.body ||
-            ""
-          ).trim();
+          const chunkPayload = (await chunkResponse.json()) as { chunks?: Array<Record<string, unknown>> };
+          const pageChunks = chunkPayload.chunks || [];
+          if (pageChunks.length === 0) break;
 
-          if (!rawText) continue;
-          const heading = [sectionLabel, sectionTitle].filter(Boolean).join(" ");
-          assembledChunks.push(heading ? `${heading}\n${rawText}` : rawText);
+          for (const chunk of pageChunks) {
+            const sectionLabel = String(chunk.article_label || chunk.group_label || "").trim();
+            const sectionTitle = String(chunk.article_title || chunk.group_title || "").trim();
+            const rawText = String(
+              chunk.text ||
+              chunk.content ||
+              chunk.full_text ||
+              chunk.chunk_text ||
+              chunk.body ||
+              ""
+            ).trim();
+
+            if (!rawText) continue;
+            const heading = [sectionLabel, sectionTitle].filter(Boolean).join(" ");
+            assembledChunks.push(heading ? `${heading}\n${rawText}` : rawText);
+          }
+
+          if (pageChunks.length < pageSize) break;
         }
 
-        if (pageChunks.length < pageSize) break;
+        const deduped = Array.from(new Set(assembledChunks.filter(Boolean)));
+        const fullTextFromChunks = deduped.join("\n\n");
+        const detailFallback = String(
+          detailPayload?.full_text ||
+          detailPayload?.content ||
+          detailPayload?.text ||
+          detailPayload?.subtitle ||
+          ""
+        ).trim();
+
+        const mergedText = fullTextFromChunks || detailFallback || "";
+        return { mergedText, ok: Boolean(detailResponse.ok || fullTextFromChunks) };
+      };
+
+      let targetDocId = (item.documentId || item.id || "").trim();
+      let fullText = "";
+      if (targetDocId) {
+        const firstPass = await fetchByDocId(targetDocId);
+        fullText = firstPass.mergedText;
       }
 
-      const deduped = Array.from(new Set(assembledChunks.filter(Boolean)));
-      const fullTextFromChunks = deduped.join("\n\n");
-      const detailFallback = String(
-        detailPayload?.full_text ||
-        detailPayload?.content ||
-        detailPayload?.text ||
-        detailPayload?.subtitle ||
-        ""
-      ).trim();
+      // Fallback: re-resolve doc_id by title when result carries a non-canonical id (common in some EU search hits).
+      if (!fullText && item.title.trim()) {
+        const resolveResponse = await fetch(
+          `/api/library?source=${encodeURIComponent(item.source)}&q=${encodeURIComponent(item.title)}&limit=10`,
+          { headers: { Authorization: `Bearer ${jwtToken}` } }
+        );
+        if (resolveResponse.ok) {
+          const resolvePayload = (await resolveResponse.json()) as { results?: Array<Record<string, unknown>> };
+          const resolved = (resolvePayload.results || []).find((entry) => entry.document_id || entry.id);
+          const resolvedDocId = String(resolved?.document_id || resolved?.id || "").trim();
+          if (resolvedDocId && resolvedDocId !== targetDocId) {
+            const secondPass = await fetchByDocId(resolvedDocId);
+            fullText = secondPass.mergedText || fullText;
+          }
+        }
+      }
 
-      const fullText = fullTextFromChunks || detailFallback || item.subtitle;
+      fullText = fullText || item.subtitle;
       setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: fullText }));
     } catch {
       setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: item.subtitle }));
@@ -325,7 +357,7 @@ export default function LibraryPage() {
     if (results.length === 0) return;
     const timer = setTimeout(() => {
       results.slice(0, 2).forEach((item) => {
-        const itemKey = `${item.source}-${item.id}`;
+        const itemKey = `${item.source}-${item.documentId || item.id}`;
         if (expandedTextByItem[itemKey] || loadingItemKeys[itemKey]) return;
         loadExpandedText(item, itemKey, { prefetch: true });
       });
@@ -471,7 +503,7 @@ export default function LibraryPage() {
                     }}
                   >
                     {results.map((item) => {
-                      const itemKey = `${item.source}-${item.id}`;
+                      const itemKey = `${item.source}-${item.documentId || item.id}`;
                       const isExpanded = expandedItemKey === itemKey;
                       const expandedText = expandedTextByItem[itemKey] || item.subtitle;
                       return (
