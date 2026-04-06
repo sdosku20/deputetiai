@@ -34,6 +34,9 @@ function ChatPageContent() {
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
   const [selectedLawLabel, setSelectedLawLabel] = useState("Ligji i BE-se");
   const [focusInputSignal, setFocusInputSignal] = useState(0);
+  const [animatedAssistantMessageId, setAnimatedAssistantMessageId] = useState<number | null>(null);
+  const hasHydratedMessagesRef = React.useRef(false);
+  const previousMessageCountRef = React.useRef(0);
 
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
@@ -70,11 +73,6 @@ function ChatPageContent() {
     [agentMessages]
   );
 
-  const latestAssistantMessageId = useMemo(() => {
-    const assistantMessages = displayMessages.filter((msg) => !msg.fromUser);
-    return assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1].id : null;
-  }, [displayMessages]);
-
   // Build navigation items (reserved for future app sections)
   const navigationItems = useMemo<NavigationItem[]>(() => [], []);
 
@@ -101,6 +99,31 @@ function ChatPageContent() {
     window.addEventListener("selectedLawUpdated", onSelectedLawUpdated as EventListener);
     return () => window.removeEventListener("selectedLawUpdated", onSelectedLawUpdated as EventListener);
   }, []);
+
+  useEffect(() => {
+    // New session/history context: do not animate previously saved messages.
+    hasHydratedMessagesRef.current = false;
+    previousMessageCountRef.current = 0;
+    setAnimatedAssistantMessageId(null);
+  }, [sessionId]);
+
+  useEffect(() => {
+    const currentCount = displayMessages.length;
+    if (!hasHydratedMessagesRef.current) {
+      hasHydratedMessagesRef.current = true;
+      previousMessageCountRef.current = currentCount;
+      return;
+    }
+
+    if (currentCount > previousMessageCountRef.current) {
+      const lastMessage = displayMessages[currentCount - 1];
+      if (lastMessage && !lastMessage.fromUser) {
+        setAnimatedAssistantMessageId(lastMessage.id);
+      }
+    }
+
+    previousMessageCountRef.current = currentCount;
+  }, [displayMessages]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -317,7 +340,7 @@ function ChatPageContent() {
                         refId={parsed?.refId || null}
                         sources={msg.sources}
                         reasoningSteps={msg.reasoningSteps}
-                        animateTyping={!msg.fromUser && latestAssistantMessageId === msg.id}
+                        animateTyping={!msg.fromUser && animatedAssistantMessageId === msg.id}
                         onToggleExpand={toggleExpandedMessage}
                       />
                     );
