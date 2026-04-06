@@ -11,7 +11,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -109,6 +109,7 @@ const appTheme = createTheme({
 });
 
 export function RootProviders({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -123,11 +124,15 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
       })
   );
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={appTheme}>
         <CssBaseline />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>{mounted ? children : null}</AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
