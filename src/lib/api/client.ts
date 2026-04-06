@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
   if (API_BASE_URL.includes('asistenti.deputeti.ai')) {
     console.error('[API Config] ⚠️ WARNING: Using old endpoint! Please set NEXT_PUBLIC_API_URL=https://eu-law.deputeti.ai');
   }
-  
+
   console.log('[API Config] Environment check:', {
     API_BASE_URL,
     DEFAULT_MODEL,
@@ -62,21 +62,21 @@ class APIClient {
       async (config) => {
         // Get JWT token from localStorage (from login) or login if missing
         let jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-        
+
         // If no token, try to get one (this will be async, but axios supports async interceptors)
         if (!jwtToken && typeof window !== 'undefined') {
           jwtToken = await self.ensureValidToken();
         }
-        
+
         const fullUrl = `${config.baseURL}${config.url}`;
         console.log(`[API Client] 📤 ${config.method?.toUpperCase()} ${fullUrl}`);
-        
+
         // Log the actual data that will be sent
         const requestDataForLog = config.data;
-        const requestDataJson = typeof requestDataForLog === 'string' 
-          ? requestDataForLog 
+        const requestDataJson = typeof requestDataForLog === 'string'
+          ? requestDataForLog
           : JSON.stringify(requestDataForLog);
-        
+
         console.log('[API Client] Request config:', {
           fullUrl: fullUrl,
           baseURL: config.baseURL,
@@ -91,7 +91,7 @@ class APIClient {
           dataAsJson: requestDataJson,
           hasJWT: !!config.headers['Authorization'],
         });
-        
+
         // Use JWT Bearer token if available
         if (jwtToken) {
           config.headers['Authorization'] = `Bearer ${jwtToken}`;
@@ -110,27 +110,27 @@ class APIClient {
       }
     );
 
-      // Response interceptor - handle errors and token refresh
-      this.client.interceptors.response.use(
-        (response) => {
-          console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-          
-          return response;
-        },
+    // Response interceptor - handle errors and token refresh
+    this.client.interceptors.response.use(
+      (response) => {
+        console.log(`[API Client] ✅ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+
+        return response;
+      },
       async (error: AxiosError) => {
         const status = error.response?.status || error.code || 'Network Error';
         const method = error.config?.method?.toUpperCase();
         const url = error.config?.url;
         const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
-        
+
         console.error(`[API Client] ❌ ${status} ${method} ${fullUrl}`);
-        
+
         // Better error logging - extract data properly
         const responseData = error.response?.data;
-        const responseDataStr = responseData 
+        const responseDataStr = responseData
           ? (typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2))
           : 'No response data';
-        
+
         // Log comprehensive error details
         console.error('[API Client] Error details:', {
           errorCode: error.code,
@@ -146,21 +146,21 @@ class APIClient {
           requestData: error.config?.data ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2)) : 'No request data',
           hasJWT: !!error.config?.headers?.['Authorization'],
         });
-        
+
         // Log full error response for 500 errors
         if (error.response?.status === 500) {
           console.error('[API Client] 500 Server Error - Full response:', JSON.stringify(error.response?.data, null, 2));
         }
-        
+
         // Handle 401 Unauthorized - token might be expired, try to refresh
         if (error.response?.status === 401) {
           console.warn('[API Client] ⚠️ 401 Unauthorized - token may be expired, attempting to refresh...');
-          
+
           // Clear old token
           if (typeof window !== 'undefined') {
             localStorage.removeItem('jwt_token');
           }
-          
+
           // Try to get a new token
           if (typeof window !== 'undefined') {
             try {
@@ -176,7 +176,7 @@ class APIClient {
             }
           }
         }
-        
+
         // Enhanced: Export error details in copyable format for debugging
         // Handle network errors and timeouts gracefully
         if (error.code === 'ECONNABORTED') {
@@ -200,14 +200,14 @@ class APIClient {
   // Helper method to ensure we have a valid JWT token
   private async ensureValidToken(): Promise<string | null> {
     if (typeof window === 'undefined') return null;
-    
+
     let jwtToken = localStorage.getItem('jwt_token');
-    
+
     // If no token, try to login
     if (!jwtToken) {
       console.log('[API Client] No JWT token found, attempting login...');
       try {
-        const loginResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        const loginResponse = await fetch(`/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -215,12 +215,13 @@ class APIClient {
             password: 'IUsedToBeAStrongPass__',
           }),
         });
-        
+
         if (loginResponse.ok) {
           const loginData = await loginResponse.json();
           jwtToken = loginData.access_token || loginData.token || null;
           if (jwtToken) {
             localStorage.setItem('jwt_token', jwtToken);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
             console.log('[API Client] ✓ Login successful, JWT token obtained');
           } else {
             console.error('[API Client] ❌ Login response missing token:', loginData);
@@ -233,7 +234,7 @@ class APIClient {
         console.error('[API Client] ❌ Login error:', loginError);
       }
     }
-    
+
     return jwtToken;
   }
 
@@ -252,7 +253,7 @@ class APIClient {
         ...config.headers,
       }
     } : undefined;
-    
+
     const response = await this.client.post<T>(url, data, mergedConfig);
     return response.data;
   }
@@ -265,6 +266,8 @@ export const apiClient = new APIClient();
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  sources?: ChatSource[];
+  reasoningSteps?: string[];
 }
 
 export interface ChatCompletionRequest {
@@ -290,6 +293,22 @@ export interface ChatCompletionResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+  sources?: unknown;
+  metadata?: unknown;
+}
+
+export interface ChatSource {
+  label: string;
+  title?: string;
+  reference?: string;
+  treaty?: string;
+  article?: string;
+  documentId?: string;
+  articleHeading?: string;
+  textPreview?: string;
+  sourceType?: string;
+  score?: number;
+  dataSource?: "eu_law" | "albanian";
 }
 
 // Simplified response for our chat interface
@@ -297,6 +316,8 @@ export interface ChatResponse {
   success: boolean;
   response: string;
   error?: string;
+  sources?: ChatSource[];
+  reasoningSteps?: string[];
 }
 
 // Session-based message storage (client-side only)
@@ -343,6 +364,116 @@ class ChatAPIClient {
     this.apiClient = apiClient;
   }
 
+  private extractSources(rawSources: unknown, content: string): ChatSource[] {
+    if (Array.isArray(rawSources)) {
+      return rawSources
+        .map((item) => {
+          if (typeof item === "string") {
+            const text = item.trim();
+            return text ? { label: text } : null;
+          }
+          if (item && typeof item === "object") {
+            const record = item as Record<string, unknown>;
+            const rawLabel = record.label || record.title || record.reference || record.source || record.id;
+            const fallbackLabel = (() => {
+              const srcType = typeof record.source_type === "string" ? record.source_type.trim() : "";
+              const treaty = typeof record.treaty === "string" ? record.treaty.trim() : "";
+              const article = typeof record.article === "string" ? record.article.trim() : "";
+              const docId =
+                typeof record.document_id === "string"
+                  ? record.document_id.trim()
+                  : typeof record.document_id === "number"
+                    ? String(record.document_id)
+                    : "";
+
+              if (treaty && article) return `[${treaty}] ${article}`;
+              if (srcType && docId) return `${srcType}:${docId}`;
+              if (srcType) return srcType;
+              if (docId) return docId;
+              return "";
+            })();
+
+            const resolvedLabel =
+              typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.trim() : fallbackLabel;
+
+            if (resolvedLabel) {
+              return {
+                label: resolvedLabel,
+                title: typeof record.title === "string" ? record.title : undefined,
+                reference: typeof record.reference === "string" ? record.reference : undefined,
+                treaty: typeof record.treaty === "string" ? record.treaty : undefined,
+                article: typeof record.article === "string" ? record.article : undefined,
+                documentId:
+                  typeof record.document_id === "string"
+                    ? record.document_id
+                    : typeof record.document_id === "number"
+                      ? String(record.document_id)
+                      : undefined,
+                articleHeading: typeof record.article_heading === "string" ? record.article_heading : undefined,
+                textPreview: typeof record.text_preview === "string" ? record.text_preview : undefined,
+                sourceType: typeof record.source_type === "string" ? record.source_type : undefined,
+                score: typeof record.score === "number" ? record.score : undefined,
+                dataSource: record.data_source === "albanian" ? "albanian" : record.data_source === "eu_law" ? "eu_law" : undefined,
+              };
+            }
+          }
+          return null;
+        })
+        .filter((item): item is ChatSource => Boolean(item))
+        .slice(0, 12);
+    }
+
+    const sourcesFromContent = content.match(/(?:\*\*Sources:\*\*|Sources:)\s*([^\n]+)/i);
+    if (sourcesFromContent?.[1]) {
+      return sourcesFromContent[1]
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((label) => ({ label }))
+        .slice(0, 12);
+    }
+
+    return [];
+  }
+
+  private extractReasoningSteps(rawMetadata: unknown, content: string, sourcesCount: number): string[] {
+    if (rawMetadata && typeof rawMetadata === "object") {
+      const metadata = rawMetadata as Record<string, unknown>;
+      const candidates = ["thinking_steps", "reasoning_steps", "steps", "thoughts"];
+
+      for (const key of candidates) {
+        const value = metadata[key];
+        if (Array.isArray(value)) {
+          const steps = value
+            .map((step) => {
+              if (typeof step === "string") return step.trim();
+              if (step && typeof step === "object") {
+                const record = step as Record<string, unknown>;
+                const txt = record.text || record.content || record.summary || record.title;
+                return typeof txt === "string" ? txt.trim() : "";
+              }
+              return "";
+            })
+            .filter(Boolean)
+            .slice(0, 8);
+          if (steps.length > 0) return steps;
+        }
+      }
+    }
+
+    const fallbackSteps: string[] = [];
+    fallbackSteps.push("Klasifikimi i pyetjes dhe percaktimi i kontekstit ligjor");
+    fallbackSteps.push("Kerkimi i fragmenteve relevante ne bazen e burimeve");
+    if (sourcesCount > 0) {
+      fallbackSteps.push(`Vleresimi i ${sourcesCount} burimeve me relevante`);
+    }
+    if (/retrieval:/i.test(content)) {
+      fallbackSteps.push("Pergjigjja u ndertua mbi fragmentet e rikuperuara (retrieval)");
+    }
+    fallbackSteps.push("Sinteza e pergjigjes duke respektuar kufizimet e evidences");
+    return fallbackSteps;
+  }
+
   /**
    * Get or create a conversation
    */
@@ -362,7 +493,7 @@ class ChatAPIClient {
     // Create new conversation
     try {
       const response = await this.apiClient.post<Conversation>('/api/v1/conversations', {
-        title: 'New conversation',
+        title: 'Bisede e re',
         profile: 'general',
       });
       console.log('[ChatAPI] Created new conversation:', response.id);
@@ -389,8 +520,11 @@ class ChatAPIClient {
 
       // Send an abstracted payload to the local proxy. The proxy builds the
       // backend OpenAI-compatible shape server-side.
+      const selectedLaw = typeof window !== 'undefined' ? localStorage.getItem('selected_law') : null;
+      const source: "eu_law" | "albanian" = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
       const requestBody = {
         prompt: userMessage,
+        source,
       };
 
       // Log what we're actually sending
@@ -401,31 +535,109 @@ class ChatAPIClient {
       console.log('[ChatAPI] Request details:', {
         messageCount: messages.length,
         messagePreview: userMessage.substring(0, 80),
+        source,
       });
+
+      // Ensure JWT is present when backend path requires bearer auth
+      // (currently needed for albanian conversation-mode proxying).
+      const ensureJwtToken = async (forceRefresh = false): Promise<string | null> => {
+        if (typeof window === 'undefined') return null;
+        if (forceRefresh) {
+          localStorage.removeItem('jwt_token');
+        }
+
+        const existing = localStorage.getItem('jwt_token');
+        if (existing) return existing;
+
+        try {
+          const loginResponse = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: 'michael',
+              password: 'IUsedToBeAStrongPass__',
+            }),
+          });
+          if (!loginResponse.ok) return null;
+
+          const loginData = await loginResponse.json() as { access_token?: string; token?: string };
+          const token = loginData.access_token || loginData.token || null;
+          if (token) {
+            localStorage.setItem('jwt_token', token);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
+          }
+          return token;
+        } catch {
+          return null;
+        }
+      };
 
       // Step 4: Send request via local proxy to keep API key server-side
-      const proxyResponse = await axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 120000,
-      });
-      const response = proxyResponse.data;
+      let jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+      if (source === 'albanian') {
+        jwtToken = await ensureJwtToken();
+      }
 
-      // Extract 8-char reference ID from response for backend tracking
+      const sendProxyRequest = (token: string | null) =>
+        axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          timeout: 120000,
+        });
+
+      let proxyResponse;
+      try {
+        proxyResponse = await sendProxyRequest(jwtToken);
+      } catch (error: any) {
+        // Albanian mode can fail with 401 if token is stale/missing; refresh once.
+        if (source === 'albanian' && error?.response?.status === 401) {
+          const refreshedToken = await ensureJwtToken(true);
+          proxyResponse = await sendProxyRequest(refreshedToken);
+        } else {
+          throw error;
+        }
+      }
+      const response = proxyResponse.data;
+      const responseSourceSummary = Array.isArray(response.sources)
+        ? response.sources.slice(0, 8).map((item) => {
+          if (item && typeof item === "object") {
+            const sourceRecord = item as Record<string, unknown>;
+            return String(
+              sourceRecord.source ||
+              sourceRecord.data_source ||
+              sourceRecord.source_type ||
+              sourceRecord.treaty ||
+              sourceRecord.id ||
+              "unknown"
+            );
+          }
+          return typeof item === "string" ? item : "unknown";
+        })
+        : [];
+
+      // Extract stable short reference ID from response for backend tracking
       const rawId = response.id || '';
-      const refId = rawId.replace('chatcmpl-', '').substring(0, 8) || '';
+      const normalizedId = rawId.replace(/^chatcmpl-/, '');
+      const tailRefMatch = normalizedId.match(/([a-z0-9]{8,})$/i);
+      const refId = tailRefMatch
+        ? tailRefMatch[1].slice(0, 8)
+        : normalizedId.slice(0, 8) || '';
 
       console.log('[ChatAPI] Response received:', {
         status: 'success',
         rawId,
         refId,
+        selectedLaw,
+        requestSource: source,
+        responseSourceSummary,
         fullResponse: response,
       });
 
       // Extract assistant message from response - return EXACTLY as received from backend
       const assistantMessage = response.choices?.[0]?.message?.content || '';
-      
+
       if (!assistantMessage) {
         console.error('[ChatAPI] No assistant message in response:', response);
         return {
@@ -439,15 +651,17 @@ class ChatAPIClient {
       const finalResponse = refId
         ? `${assistantMessage}\n\nref: ${refId}`
         : assistantMessage;
+      const sources = this.extractSources(response.sources, assistantMessage);
+      const reasoningSteps = this.extractReasoningSteps(response.metadata, assistantMessage, sources.length);
       console.log('[ChatAPI] Response with ref:', refId, finalResponse.substring(0, 80));
 
       // Store conversation in localStorage for session management
       const updatedMessages: ChatMessage[] = [
         ...conversationHistory,
         { role: "user", content: userMessage },
-        { role: "assistant", content: finalResponse },
+        { role: "assistant", content: finalResponse, sources, reasoningSteps },
       ];
-      
+
       this.saveSessionMessages(sessionId, updatedMessages);
 
       // Dispatch event to refresh sessions list in UI
@@ -458,6 +672,8 @@ class ChatAPIClient {
       return {
         success: true,
         response: finalResponse,
+        sources,
+        reasoningSteps,
       };
     } catch (error: any) {
       // Better error logging
@@ -467,16 +683,16 @@ class ChatAPIClient {
       const errorCode = error.code;
       const errorMessage = error.message;
       const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url;
-      
+
       // Extract error message properly
-      const errorDataStr = errorData 
+      const errorDataStr = errorData
         ? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2))
         : 'No error data';
-      
-      const requestDataStr = error.config?.data 
+
+      const requestDataStr = error.config?.data
         ? (typeof error.config.data === 'string' ? error.config.data : JSON.stringify(error.config.data, null, 2))
         : 'No request data';
-      
+
       // Comprehensive error logging
       console.error('[ChatAPI] ❌ Error sending message:', {
         errorCode: errorCode,
@@ -494,7 +710,7 @@ class ChatAPIClient {
         isTimeout: errorCode === 'ECONNABORTED',
         isCORS: errorMessage?.includes('CORS') || errorMessage?.includes('Access-Control'),
       });
-      
+
       // Special handling for network errors
       if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
         console.error('[ChatAPI] 🔍 Network Error Diagnosis:');
@@ -504,24 +720,24 @@ class ChatAPIClient {
         console.error('  4. Check if SSL certificate is valid');
         console.error('  5. Try opening the URL directly in browser:', fullUrl);
       }
-      
+
       // Build a production-safe user message (avoid leaking endpoint URLs/internal details)
-      let userErrorMessage = 'Something went wrong while processing your request. Please try again.';
+      let userErrorMessage = 'Ndodhi nje gabim gjate perpunimit te kerkeses. Ju lutem provoni perseri.';
 
       if (errorCode === 'ERR_NETWORK' || errorMessage?.includes('Network Error')) {
-        userErrorMessage = 'Network issue detected. Please check your connection and try again.';
+        userErrorMessage = 'U zbulua problem me rrjetin. Ju lutem kontrolloni lidhjen dhe provoni perseri.';
       } else if (errorCode === 'ECONNABORTED') {
-        userErrorMessage = 'The request is taking longer than expected. Please try again.';
+        userErrorMessage = 'Kerkesa po zgjat me shume se sa pritej. Ju lutem provoni perseri.';
       } else if (errorStatus === 401 || errorStatus === 403) {
-        userErrorMessage = 'Authentication failed. Please sign in again.';
+        userErrorMessage = 'Autentikimi deshtoi. Ju lutem hyni perseri.';
       } else if (errorStatus === 429) {
-        userErrorMessage = 'Too many requests at the moment. Please wait a bit and try again.';
+        userErrorMessage = 'Ka shume kerkesa per momentin. Ju lutem prisni pak dhe provoni perseri.';
       } else if (typeof errorStatus === 'number' && errorStatus >= 500) {
-        userErrorMessage = 'The service is temporarily unavailable. Please try again in a moment.';
+        userErrorMessage = 'Sherbimi eshte perkohesisht i padisponueshem. Ju lutem provoni pas pak.';
       } else if (typeof errorStatus === 'number' && errorStatus >= 400) {
-        userErrorMessage = 'The request could not be completed. Please verify your input and try again.';
+        userErrorMessage = 'Kerkesa nuk mund te plotesohej. Ju lutem verifikoni inputin dhe provoni perseri.';
       }
-      
+
       // If we got a 500 error with RAG pipeline error, show it clearly
       if (errorStatus === 500 && userErrorMessage.includes('RAG')) {
         console.error('[ChatAPI] ⚠️ RAG Pipeline Error detected!');
@@ -532,10 +748,10 @@ class ChatAPIClient {
           content: "What is Article 50 TEU?"
         }, null, 2));
       }
-      
+
       // Return error message as-is
       const translatedErrorMessage = userErrorMessage;
-      
+
       return {
         success: false,
         response: '',
@@ -549,19 +765,33 @@ class ChatAPIClient {
    */
   getConversationHistory(sessionId: string): ChatMessage[] {
     if (typeof window === 'undefined') return [];
-    
+
     try {
       const stored = localStorage.getItem(`chat_session_${sessionId}`);
       if (!stored) return [];
-      
+
       const session: SessionMessages = JSON.parse(stored);
       const messages = session.messages || [];
-      
-      // Filter to only include role and content fields (strip any extra fields like timestamp)
-      return messages.map(msg => ({
-        role: msg.role as "user" | "assistant" | "system",
-        content: String(msg.content || '')
-      })).filter(msg => msg.role && msg.content);
+
+      return messages
+        .map((msg) => {
+          const role = msg.role as "user" | "assistant" | "system";
+          const content = String(msg.content || "");
+          const sources = Array.isArray((msg as ChatMessage).sources)
+            ? (msg as ChatMessage).sources
+            : undefined;
+          const reasoningSteps = Array.isArray((msg as ChatMessage).reasoningSteps)
+            ? (msg as ChatMessage).reasoningSteps.map((step) => String(step))
+            : undefined;
+
+          return {
+            role,
+            content,
+            ...(sources ? { sources } : {}),
+            ...(reasoningSteps ? { reasoningSteps } : {}),
+          } as ChatMessage;
+        })
+        .filter((msg) => msg.role && msg.content);
     } catch (error) {
       console.error('[ChatAPI] Error loading conversation history:', error);
       return [];
@@ -573,7 +803,7 @@ class ChatAPIClient {
    */
   private saveSessionMessages(sessionId: string, messages: ChatMessage[], conversationId?: string): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       const session: SessionMessages = {
         session_id: sessionId,
@@ -581,9 +811,9 @@ class ChatAPIClient {
         messages,
         last_updated: new Date().toISOString(),
       };
-      
+
       localStorage.setItem(`chat_session_${sessionId}`, JSON.stringify(session));
-      
+
       // Update session list
       this.updateSessionList(sessionId);
     } catch (error) {
@@ -601,13 +831,13 @@ class ChatAPIClient {
     message_count: number;
   }> {
     if (typeof window === 'undefined') return [];
-    
+
     try {
       const sessionsJson = localStorage.getItem('chat_sessions_list');
       if (!sessionsJson) return [];
-      
+
       const sessions = JSON.parse(sessionsJson);
-      return sessions.sort((a: any, b: any) => 
+      return sessions.sort((a: any, b: any) =>
         new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
       );
     } catch (error) {
@@ -621,24 +851,24 @@ class ChatAPIClient {
    */
   private updateSessionList(sessionId: string): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       const stored = localStorage.getItem(`chat_session_${sessionId}`);
       if (!stored) {
         console.warn(`[ChatAPI] No session found for ${sessionId}, cannot update list`);
         return;
       }
-      
+
       const session: SessionMessages = JSON.parse(stored);
       const firstUserMessage = session.messages.find(m => m.role === 'user');
-      const preview = firstUserMessage?.content.substring(0, 50) || 'New conversation';
-      
+      const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
+
       const sessionsJson = localStorage.getItem('chat_sessions_list');
       let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
-      
+
       // Remove existing session if present
       sessions = sessions.filter(s => s.session_id !== sessionId);
-      
+
       // Add updated session at the beginning (most recent first)
       sessions.unshift({
         session_id: sessionId,
@@ -646,7 +876,7 @@ class ChatAPIClient {
         last_updated: session.last_updated,
         message_count: session.messages.length,
       });
-      
+
       localStorage.setItem('chat_sessions_list', JSON.stringify(sessions));
       console.log(`[ChatAPI] Updated sessions list. Total sessions: ${sessions.length}`);
     } catch (error) {
@@ -659,10 +889,10 @@ class ChatAPIClient {
    */
   deleteConversation(sessionId: string): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.removeItem(`chat_session_${sessionId}`);
-      
+
       // Remove from sessions list
       const sessionsJson = localStorage.getItem('chat_sessions_list');
       if (sessionsJson) {

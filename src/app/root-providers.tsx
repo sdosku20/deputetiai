@@ -12,7 +12,101 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import { AuthProvider } from "@/contexts/AuthContext";
+
+const appTheme = createTheme({
+  typography: {
+    fontFamily: "var(--font-space-grotesk), var(--font-geist-sans), sans-serif",
+    h6: {
+      fontWeight: 600,
+      letterSpacing: "-0.01em",
+    },
+    body2: {
+      color: "hsl(var(--text-muted))",
+    },
+  },
+  shape: {
+    borderRadius: 12,
+  },
+  palette: {
+    background: {
+      default: "hsl(var(--app-bg))",
+      paper: "hsl(var(--surface))",
+    },
+    primary: {
+      main: "hsl(var(--primary))",
+      contrastText: "hsl(var(--primary-foreground))",
+    },
+    text: {
+      primary: "hsl(var(--text-primary))",
+      secondary: "hsl(var(--text-muted))",
+    },
+    divider: "hsl(var(--border-soft))",
+  },
+  transitions: {
+    duration: {
+      shortest: 120,
+      shorter: 160,
+      short: 200,
+      standard: 250,
+    },
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: "hsl(var(--app-bg))",
+          color: "hsl(var(--text-primary))",
+        },
+      },
+    },
+    MuiPaper: {
+      defaultProps: {
+        elevation: 0,
+      },
+      styleOverrides: {
+        root: {
+          borderRadius: 14,
+          border: "1px solid hsl(var(--border-soft))",
+          backgroundImage: "none",
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          borderRight: "1px solid hsl(var(--border-soft))",
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          "& .MuiInputBase-root": {
+            borderRadius: 18,
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: "none",
+          borderRadius: 10,
+          fontWeight: 500,
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+        },
+      },
+    },
+  },
+});
 
 export function RootProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -31,7 +125,10 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -1,16 +1,21 @@
 "use client";
 
 import {
+  Button,
+  Box,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  Box,
+  TextField,
   Typography,
 } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
+import AddIcon from "@mui/icons-material/Add";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import SearchIcon from "@mui/icons-material/Search";
 import DeleteOutline from "@mui/icons-material/DeleteOutline";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useConversationSessions } from "@/hooks/useConversationSessions";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 
@@ -21,6 +26,13 @@ interface SidebarActionsProps {
 export function SidebarActions({ actions }: SidebarActionsProps) {
   const router = useRouter();
   const { sessions, deleteSession } = useConversationSessions();
+  const [openSections, setOpenSections] = useState({
+    projects: true,
+    bookmarks: true,
+    alerts: true,
+    saved: true,
+    history: true,
+  });
 
   // Handle new query - go to chat page with no session ID (fresh start)
   const handleNewQuery = () => {
@@ -86,94 +98,275 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
     );
   }
 
-  // Default: Show New Query button and Queries section with clean design
+  const historyItems = sessions;
+
+  const toggleSection = (key: keyof typeof openSections) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Default: Screenshot-inspired shell structure
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 0, px: 0 }}>
-      {/* New Query Section */}
-      <Box sx={{ px: 3, mt: 1 }}>
-        {/* ChatGPT-style New Query button with pencil-in-square icon */}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, px: 0, pb: 2 }}>
+      <Box sx={{ px: 2.5 }}>
         <Box
           onClick={handleNewQuery}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleNewQuery();
+            }
+          }}
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: "2px",
-            px: 0,
-            py: 1,
-            borderRadius: 1.5,
+            gap: 1,
+            px: 1,
+            py: 1.25,
+            borderRadius: 2,
             cursor: "pointer",
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "14px",
+            fontSize: "0.88rem",
             fontWeight: 600,
-            color: "#111827",
-            mb: 1,
-            backgroundColor: "#ffffff",
-            transition: "background-color 120ms ease",
+            color: "hsl(var(--text-primary))",
+            transition: "all 160ms ease",
+            "&:hover": {
+              backgroundColor: "hsl(var(--surface-muted))",
+            },
+            "&:focus-visible": {
+              outline: "2px solid hsl(var(--ring))",
+              outlineOffset: "2px",
+            },
           }}
         >
-          <Box
-            sx={{
-              width: 20,
-              height: 20,
-              borderRadius: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            <Box
-              component="img"
-              src="https://img.icons8.com/forma-regular/50/create-new.png"
-              alt="create-new"
-              sx={{ width: 16, height: 16, display: "block" }}
-            />
-          </Box>
-          Bëni një pyetje të re
+          <AddIcon sx={{ fontSize: 18 }} />
+          Bej nje pyetje te re
         </Box>
       </Box>
 
-      {/* Queries Section Header */}
-      <SidebarSectionHeader title="Bisedat e mëparshme" />
+      {/* Temporarily disabled: PROJEKTET
+      <Box sx={{ px: 2.5 }}>
+        <Box
+          onClick={() => toggleSection("projects")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("projects");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Projektet" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.projects ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.projects && (
+          <Typography sx={{ fontSize: "0.82rem", color: "hsl(var(--text-muted))", px: 1.4, pt: 0.2 }}>
+            Ende nuk ka projekte
+          </Typography>
+        )}
+      </Box>
+      */}
 
-      {/* Conversations Section - Clean Design */}
-      <Box sx={{ px: 3, mt: 0.25 }}>
-        {/* Past Conversations List - ChatGPT-style, no inner scrollbar (outer sidebar scrolls) */}
-        {sessions.length > 0 ? (
-          <List dense sx={{ mb: 0.75, pl: 0 }}>
-            {sessions.map((session, index) => (
-              <ListItem key={`session-${session.session_id}-${index}`} disablePadding sx={{ mb: 0.125 }}>
+      {/* Temporarily disabled: FAQERUAJTES, SINJALIZIME LIGJORE, KERKIME TE RUAJTURA
+      <Box sx={{ px: 2.5 }}>
+        <Box
+          onClick={() => toggleSection("bookmarks")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("bookmarks");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Faqeruajtes" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.bookmarks ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ px: 2.5 }}>
+        <Box
+          onClick={() => toggleSection("alerts")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("alerts");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Sinjalizime Ligjore" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.alerts ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.alerts && (
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<AddIcon />}
+            sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
+          >
+            Sinjalizim i ri
+          </Button>
+        )}
+      </Box>
+
+      <Box sx={{ px: 2.5 }}>
+        <Box
+          onClick={() => toggleSection("saved")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("saved");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Kerkime te Ruajtura" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.saved ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+        {openSections.saved && (
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<AddIcon />}
+            sx={{ justifyContent: "center", color: "hsl(var(--text-muted))", mt: 0.2 }}
+          >
+            Ruaj kerkimin
+          </Button>
+        )}
+      </Box>
+      */}
+
+      {/* Temporarily disabled: sidebar search bar
+      <Box sx={{ px: 2.5, pt: 0.5 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Kerko..."
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon sx={{ fontSize: 16, color: "hsl(var(--text-muted))", mr: 0.75 }} />,
+            },
+          }}
+          sx={{
+            "& .MuiInputBase-root": {
+              height: 36,
+              bgcolor: "hsl(var(--surface))",
+            },
+            "& .MuiInputBase-input": {
+              fontSize: "0.86rem",
+            },
+          }}
+        />
+      </Box>
+      */}
+
+      <Box sx={{ display: "flex", alignItems: "center", px: 2.5, pt: 0.8, pb: 0.4 }}>
+        <Box
+          onClick={() => toggleSection("history")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection("history");
+            }
+          }}
+          sx={{ display: "flex", alignItems: "center", width: "100%", cursor: "pointer", py: 0.25 }}
+        >
+          <SidebarSectionHeader title="Historiku" />
+          <KeyboardArrowDownIcon
+            sx={{
+              ml: "auto",
+              mr: 0.6,
+              color: "hsl(var(--text-muted))",
+              fontSize: 18,
+              transform: openSections.history ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ px: 2.5, mt: -0.5 }}>
+        {openSections.history && historyItems.length > 0 ? (
+          <List dense sx={{ mb: 0.75, pl: 0, pt: 0 }}>
+            {historyItems.map((session, index) => (
+              <ListItem key={`session-${session.session_id}-${index}`} disablePadding sx={{ mb: 0.35 }}>
                 <Box
                   sx={{
                     width: "100%",
                     display: "flex",
                     alignItems: "center",
                     gap: 0.5,
-                    "& .delete-btn": { opacity: 0, transition: "opacity 120ms ease" },
+                    "& .delete-btn": { opacity: 0, transition: "opacity 140ms ease" },
                     "&:hover .delete-btn": { opacity: 1 },
                   }}
                 >
                   <ListItemButton
                     onClick={() => handleSessionClick(session.session_id)}
                     sx={{
-                      px: 0,
-                      py: 0.25,
-                      borderRadius: 1.5,
+                      px: 0.75,
+                      py: 0.55,
+                      borderRadius: 2,
                       flex: 1,
                       "&:hover": {
-                        backgroundColor: "#f9f8f6",
+                        backgroundColor: "hsl(var(--surface-muted))",
                       },
                     }}
                   >
                     <ListItemText
-                      primary={session.preview || "New conversation"}
+                      primary={session.preview || "Bisede e re"}
                       slotProps={{
                         primary: {
                           sx: {
-                            fontSize: "14px",
+                            fontSize: "0.86rem",
                             fontWeight: 400,
-                            color: "#111827",
-                            fontFamily: "'Space Grotesk', sans-serif",
+                            color: "hsl(var(--text-primary))",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -189,15 +382,15 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      width: 24,
-                      height: 24,
+                      width: 26,
+                      height: 26,
                       borderRadius: 1,
                       cursor: "pointer",
-                      color: "#6b7280",
-                      "&:hover": { backgroundColor: "#f3f4f6", color: "#111827" },
+                      color: "hsl(var(--text-muted))",
+                      "&:hover": { backgroundColor: "hsl(var(--surface-muted))", color: "hsl(var(--text-primary))" },
                     }}
-                    title="Delete conversation"
-                    aria-label={`Delete conversation`}
+                    title="Fshi biseden"
+                    aria-label={`Fshi biseden`}
                     role="button"
                   >
                     <DeleteOutline sx={{ fontSize: 18 }} />
@@ -206,13 +399,13 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
               </ListItem>
             ))}
           </List>
-        ) : (
-          <Box sx={{ py: 2, textAlign: "center", color: "#9ca3af" }}>
-            <Typography sx={{ fontSize: "13px", fontFamily: "'Space Grotesk', sans-serif" }}>
+        ) : openSections.history ? (
+          <Box sx={{ color: "hsl(var(--text-muted))", px: 1.4 }}>
+            <Typography sx={{ fontSize: "0.82rem" }}>
               Ende nuk ka biseda
             </Typography>
           </Box>
-        )}
+        ) : null}
       </Box>
     </Box>
   );

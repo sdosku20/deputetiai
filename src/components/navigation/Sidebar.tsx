@@ -1,27 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 // Optimized: Direct imports instead of barrel imports (saves 10-15KB)
 import Drawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
+import CompareArrowsOutlinedIcon from "@mui/icons-material/CompareArrowsOutlined";
+import { usePathname, useRouter } from "next/navigation";
 import type { NavigationItem } from "@/types/dashboard";
 import { SidebarLogo } from "./SidebarLogo";
-import { SidebarSectionHeader } from "./SidebarSectionHeader";
-import { SidebarNavList } from "./SidebarNavList";
 import { SidebarActions } from "./SidebarActions";
-
-/**
- * Sidebar Component
- * Matches EXACT styling from root frontend SideMenu.tsx
- * - 240px fixed width
- * - White background
- * - Space Grotesk font throughout
- * - Logo section (30x30px)
- * - Scrollable content section with "Dashboard" and "Actions" headers
- * - Profile avatar section at bottom (120px height)
- * - Hover: #f9f8f6
- * - Selected: #f4f3ef, fontWeight 600
- */
 
 interface SidebarProps {
   items: NavigationItem[];
@@ -36,46 +25,39 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  items,
-  selectedItem,
-  onItemSelect,
+  items: _items,
+  selectedItem: _selectedItem,
+  onItemSelect: _onItemSelect,
   user = {
     name: "User",
     email: "user@example.com",
   },
   className,
 }: SidebarProps) {
+  void _items;
+  void _selectedItem;
+  void _onItemSelect;
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Handle navigation item click
-  const handleItemClick = (item: NavigationItem) => {
-    // If item has onClick handler, use that (for filtering)
-    if (item.onClick) {
-      item.onClick();
-      return;
-    }
-
-    // Otherwise use traditional navigation
-    if (onItemSelect) {
-      onItemSelect(item.id, item.path);
-    }
-    if (item.path) {
-      router.push(item.path);
-    }
-  };
+  const footerLinks = [
+    { id: "library", label: "Biblioteka", path: "/library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "explorer", label: "Eksploro", path: "/explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { id: "compare", label: "Krahaso", path: "/compare", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
+  ];
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: 240,
+        width: 270,
         flexShrink: 0,
         "& .MuiDrawer-paper": {
-          width: 240,
+          width: 270,
           boxSizing: "border-box",
-          backgroundColor: "white",
-          borderRight: "none",
+          backgroundColor: "hsl(var(--surface))",
           boxShadow: "none",
+          borderRadius: 0,
         },
       }}
       className={className}
@@ -96,17 +78,86 @@ export function Sidebar({
             background: "transparent",
           },
           "&::-webkit-scrollbar-thumb": {
-            background: "#d1d5db",
-            borderRadius: "3px",
+            background: "hsl(var(--border-soft))",
+            borderRadius: "4px",
           },
           "&::-webkit-scrollbar-thumb:hover": {
-            background: "#9ca3af",
+            background: "hsl(var(--text-muted))",
           },
         }}
       >
-        {/* Queries Section */}
+        {/* Sidebar sections */}
         <SidebarActions />
       </Box>
+
+      <Box sx={{ px: 2, py: 1.5, borderTop: "1px solid hsl(var(--border-soft))" }}>
+        <Box>
+          {footerLinks.map((item) => (
+            <Box
+              key={item.id}
+              component="button"
+              type="button"
+              onClick={() => item.path && router.push(item.path)}
+              sx={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1,
+                py: 0.8,
+                borderRadius: 2,
+                color: pathname === item.path ? "hsl(var(--text-primary))" : "hsl(var(--text-primary))",
+                border: "none",
+                background: pathname === item.path ? "hsl(var(--surface-muted))" : "transparent",
+                textAlign: "left",
+                transition: "background-color 160ms ease",
+                "&:hover": { backgroundColor: "hsl(var(--surface-muted))" },
+                "&:focus-visible": {
+                  outline: "2px solid hsl(var(--ring))",
+                  outlineOffset: "2px",
+                },
+              }}
+            >
+              {item.icon}
+              <Typography sx={{ fontSize: "0.88rem" }}>{item.label}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          px: 2,
+          py: 1.2,
+          borderTop: "1px solid hsl(var(--border-soft))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              backgroundColor: "hsl(var(--surface-muted))",
+              display: "grid",
+              placeItems: "center",
+              fontSize: "0.74rem",
+              fontWeight: 700,
+              color: "hsl(var(--text-primary))",
+            }}
+          >
+            {(user.name || "U").slice(0, 1).toUpperCase()}
+          </Box>
+          <Typography sx={{ fontSize: "0.86rem", maxWidth: 150 }} noWrap>
+            {user.name}
+          </Typography>
+        </Box>
+      </Box>
+
     </Drawer>
   );
 }

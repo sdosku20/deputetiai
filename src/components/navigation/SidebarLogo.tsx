@@ -1,6 +1,7 @@
 // Optimized: Direct import instead of barrel import
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import Image from "next/image";
 
 interface SidebarLogoProps {
   logoSrc?: string;
@@ -11,15 +12,16 @@ interface SidebarLogoProps {
 
 export function SidebarLogo({
   logoSrc = "/Albanian_eagle.png",
-  alt = "Albanian Eagle Logo",
-  width = 40,
-  height = 30,
+  alt = "Avokati AI Logo",
+  width = 34,
+  height = 26,
 }: SidebarLogoProps) {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", pt: 3, pb: 3, px: 2 }}>
-      <Box sx={{ width, height, ml: 1 }}>
-        <img src={logoSrc} alt={alt} width={width} height={height} style={{ objectFit: "contain" }} />
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, pt: 2.4, pb: 2.2, px: 2.5 }}>
+      <Box sx={{ width, height }}>
+        <Image src={logoSrc} alt={alt} width={width} height={height} style={{ objectFit: "contain" }} priority />
       </Box>
+     
     </Box>
   );
 }

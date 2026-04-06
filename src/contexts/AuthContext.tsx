@@ -56,11 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Silently attempt to get JWT token in background (non-blocking)
     const attemptLogin = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
+        console.log('[AuthContext] Attempting login through local proxy: /api/auth/login');
         
-        console.log('[AuthContext] Attempting login to:', `${API_BASE_URL}/api/v1/auth/login`);
-        
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        const response = await fetch(`/api/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -79,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.access_token || data.token) {
             const token = data.access_token || data.token;
             localStorage.setItem('jwt_token', token);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
             console.log('[AuthContext] ✓ Background login successful, JWT token stored');
           } else {
             console.warn('[AuthContext] ⚠️ Login response missing token:', data);
@@ -106,8 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     // Silently attempt login in background
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      const response = await fetch(`/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -117,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         if (data.access_token || data.token) {
           localStorage.setItem('jwt_token', data.access_token || data.token);
+          window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
         }
       }
     } catch (err) {
@@ -145,9 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Silently refresh JWT token in background
     const attemptLogin = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
         console.log('[AuthContext] Refreshing JWT token...');
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        const response = await fetch(`/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -159,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const data = await response.json();
           if (data.access_token || data.token) {
             localStorage.setItem('jwt_token', data.access_token || data.token);
+            window.dispatchEvent(new CustomEvent('jwtTokenUpdated'));
             console.log('[AuthContext] ✓ JWT token refreshed');
           }
         } else {
