@@ -56,10 +56,22 @@ export function ComposerBar({ loading, input, onInputChange, onSend, onKeyDown, 
           disabled={loading}
           placeholder="Shkruani pyetjen tuaj..."
           inputRef={inputRef}
-          InputProps={{ disableUnderline: true }}
+          InputProps={{
+            disableUnderline: true,
+            sx: {
+              pl: 2.2,
+              "& .MuiInputBase-input": {
+                pl: 0,
+              },
+              "& .MuiInputBase-inputMultiline": {
+                pl: 0,
+              },
+            },
+          }}
           sx={{
             "& .MuiInputBase-input": {
-              px: 1,
+              pl: 0,
+              pr: 1,
               fontSize: "0.94rem",
             },
           }}

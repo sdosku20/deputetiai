@@ -51,7 +51,9 @@ export function MessageBubble({
   const [sourceDetailText, setSourceDetailText] = useState<string | null>(null);
   const [resolvedExplorerSource, setResolvedExplorerSource] = useState<"eu_law" | "albanian" | null>(null);
   const [resolvedExplorerDocId, setResolvedExplorerDocId] = useState<string | null>(null);
+  const [userBubbleLineCount, setUserBubbleLineCount] = useState(1);
   const animatedOnceRef = useRef(false);
+  const userBubbleTextRef = useRef<HTMLDivElement | null>(null);
   const sanitizeRenderedText = (value: string) =>
     value
       .replace(/\n?\*\*Sources:\*\*[^\n]*/gi, "")
@@ -307,6 +309,33 @@ export function MessageBubble({
     loadSourceDetail();
   }, [selectedSource]);
 
+  useEffect(() => {
+    if (!isUserMessage) return;
+    const element = userBubbleTextRef.current;
+    if (!element) return;
+
+    const updateLineCount = () => {
+      const styles = window.getComputedStyle(element);
+      const lineHeight = parseFloat(styles.lineHeight || "0");
+      if (!lineHeight || Number.isNaN(lineHeight)) {
+        setUserBubbleLineCount(1);
+        return;
+      }
+      const lines = Math.max(1, Math.round(element.getBoundingClientRect().height / lineHeight));
+      setUserBubbleLineCount(lines);
+    };
+
+    updateLineCount();
+    const rafId = window.requestAnimationFrame(updateLineCount);
+    const resizeObserver = new ResizeObserver(updateLineCount);
+    resizeObserver.observe(element);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+    };
+  }, [isUserMessage, text]);
+
   if (isUserMessage) {
     return (
       <Box
@@ -314,7 +343,8 @@ export function MessageBubble({
           alignSelf: "flex-end",
           bgcolor: "hsl(var(--surface))",
           border: "1px solid hsl(var(--border-soft))",
-          px: 1.5,
+          pl: userBubbleLineCount >= 2 ? 2.55 : 1.55,
+          pr: 1.5,
           py: 1,
           borderRadius: 3,
           maxWidth: { xs: "88%", sm: "72%" },
@@ -324,7 +354,9 @@ export function MessageBubble({
           wordBreak: "break-word",
         }}
       >
-        {text}
+        <Box ref={userBubbleTextRef} component="span" sx={{ display: "block" }}>
+          {text}
+        </Box>
       </Box>
     );
   }
@@ -382,14 +414,14 @@ export function MessageBubble({
                             textTransform: "none",
                             color: "hsl(var(--text-muted))",
                             "&:hover": { bgcolor: "transparent", color: "hsl(var(--text-primary))" },
-                              ...reasoningRowAnimationSx(idx),
+                            ...reasoningRowAnimationSx(idx),
                           }}
                         >
                           <Box
                             sx={{
                               width: 18,
                               height: 18,
-                                borderRadius: "4px",
+                              borderRadius: "4px",
                               border: "1px solid hsl(var(--border-soft))",
                               bgcolor: "hsl(var(--surface-muted))",
                               display: "grid",
@@ -405,20 +437,20 @@ export function MessageBubble({
                         </Button>
                       ))
                       : (group.items as string[]).map((step, idx) => (
-                          <Box
-                            key={`${group.key}-${idx}`}
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.75,
-                              ...reasoningRowAnimationSx(idx),
-                            }}
-                          >
+                        <Box
+                          key={`${group.key}-${idx}`}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                            ...reasoningRowAnimationSx(idx),
+                          }}
+                        >
                           <Box
                             sx={{
                               width: 18,
                               height: 18,
-                                borderRadius: "4px",
+                              borderRadius: "4px",
                               border: "1px solid hsl(var(--border-soft))",
                               bgcolor: "hsl(var(--surface-muted))",
                               display: "grid",
