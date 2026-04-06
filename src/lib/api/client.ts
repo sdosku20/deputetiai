@@ -366,7 +366,7 @@ class ChatAPIClient {
 
   private extractSources(rawSources: unknown, content: string): ChatSource[] {
     if (Array.isArray(rawSources)) {
-      return rawSources
+      const mappedSources: Array<ChatSource | null> = rawSources
         .map((item) => {
           if (typeof item === "string") {
             const text = item.trim();
@@ -418,9 +418,9 @@ class ChatAPIClient {
             }
           }
           return null;
-        })
-        .filter((item): item is ChatSource => Boolean(item))
-        .slice(0, 12);
+        });
+
+      return mappedSources.filter((item): item is ChatSource => item !== null).slice(0, 12);
     }
 
     const sourcesFromContent = content.match(/(?:\*\*Sources:\*\*|Sources:)\s*([^\n]+)/i);
@@ -777,11 +777,12 @@ class ChatAPIClient {
         .map((msg) => {
           const role = msg.role as "user" | "assistant" | "system";
           const content = String(msg.content || "");
-          const sources = Array.isArray((msg as ChatMessage).sources)
-            ? (msg as ChatMessage).sources
+          const chatMessage = msg as ChatMessage;
+          const sources = Array.isArray(chatMessage.sources)
+            ? chatMessage.sources
             : undefined;
-          const reasoningSteps = Array.isArray((msg as ChatMessage).reasoningSteps)
-            ? (msg as ChatMessage).reasoningSteps.map((step) => String(step))
+          const reasoningSteps = Array.isArray(chatMessage.reasoningSteps)
+            ? chatMessage.reasoningSteps.map((step) => String(step))
             : undefined;
 
           return {

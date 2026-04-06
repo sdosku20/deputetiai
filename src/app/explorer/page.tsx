@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -54,7 +54,7 @@ const SOURCE_OPTIONS: Array<{ id: SourceKey; label: string }> = [
 const EXPLORER_SEARCH_LIMIT = 50;
 const MIN_SEARCH_LENGTH = 3;
 
-export default function ExplorerPage() {
+function ExplorerPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedDocId = searchParams.get("doc_id");
@@ -505,5 +505,19 @@ export default function ExplorerPage() {
         </DashboardLayout>
       </Box>
     </Box>
+  );
+}
+
+export default function ExplorerPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+          <CircularProgress size={28} />
+        </Box>
+      }
+    >
+      <ExplorerPageContent />
+    </Suspense>
   );
 }
