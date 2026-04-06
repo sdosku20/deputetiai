@@ -66,7 +66,7 @@ export function PageHeader({
           onClick={(event) => setMenuAnchor(event.currentTarget)}
           endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18 }} />}
           sx={{
-            borderRadius: 999,
+            borderRadius: 1,
             px: 1.4,
             py: 0.55,
             border: "1px solid hsl(var(--border-soft))",
@@ -87,7 +87,7 @@ export function PageHeader({
             sx: {
               mt: 0.6,
               minWidth: 210,
-              borderRadius: 2.2,
+              borderRadius: 1,
               border: "1px solid hsl(var(--border-soft))",
               bgcolor: "hsl(var(--surface))",
             },

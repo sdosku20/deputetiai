@@ -124,7 +124,7 @@ export function SidebarActions({ actions }: SidebarActionsProps) {
             gap: 1,
             px: 1,
             py: 1.25,
-            borderRadius: 2,
+            borderRadius: 1,
             cursor: "pointer",
             fontSize: "0.88rem",
             fontWeight: 600,

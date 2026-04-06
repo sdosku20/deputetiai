@@ -182,7 +182,7 @@ export function PromptSuggestionGrid({ onPromptClick, selectedLawLabel = "Ligji 
                   variant="outlined"
                   sx={{
                     justifyContent: "flex-start",
-                    borderRadius: 2,
+                    borderRadius: 1,
                     py: 0.75,
                     px: 1.1,
                     fontSize: "0.82rem",

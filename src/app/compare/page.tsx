@@ -170,6 +170,7 @@ export default function ComparePage() {
   const [historyExpanded, setHistoryExpanded] = useState<Record<number, string | false>>({});
 
   const userForHeader = authUser ? { id: authUser.id || "", email: authUser.email || "" } : undefined;
+  const squaredFieldSx = { "& .MuiOutlinedInput-root": { borderRadius: 1 } };
 
   const ensureJwtToken = useCallback(async (): Promise<string | null> => {
     if (typeof window === "undefined") return null;
@@ -526,7 +527,7 @@ export default function ComparePage() {
                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.2 }}>
                   <Box>
                     <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))", fontWeight: 600, mb: 0.4 }}>LIGJI A</Typography>
-                    <TextField select fullWidth size="small" value={sourceA} onChange={(e) => setSourceA(e.target.value as SourceId)}>
+                    <TextField select fullWidth size="small" value={sourceA} onChange={(e) => setSourceA(e.target.value as SourceId)} sx={squaredFieldSx}>
                       {SOURCE_OPTIONS.map((option) => <MenuItem key={option.id} value={option.id}>{option.label}</MenuItem>)}
                     </TextField>
                     <Autocomplete
@@ -581,13 +582,13 @@ export default function ComparePage() {
                         );
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} size="small" fullWidth placeholder="Kerko sipas emrit ose numrit..." sx={{ mt: 0.75 }} />
+                        <TextField {...params} size="small" fullWidth placeholder="Kerko sipas emrit ose numrit..." sx={{ mt: 0.75, ...squaredFieldSx }} />
                       )}
                     />
                   </Box>
                   <Box>
                     <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))", fontWeight: 600, mb: 0.4 }}>LIGJI B</Typography>
-                    <TextField select fullWidth size="small" value={sourceB} onChange={(e) => setSourceB(e.target.value as SourceId)}>
+                    <TextField select fullWidth size="small" value={sourceB} onChange={(e) => setSourceB(e.target.value as SourceId)} sx={squaredFieldSx}>
                       {SOURCE_OPTIONS.map((option) => <MenuItem key={option.id} value={option.id}>{option.label}</MenuItem>)}
                     </TextField>
                     <Autocomplete
@@ -642,7 +643,7 @@ export default function ComparePage() {
                         );
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} size="small" fullWidth placeholder="Kerko sipas emrit ose numrit..." sx={{ mt: 0.75 }} />
+                        <TextField {...params} size="small" fullWidth placeholder="Kerko sipas emrit ose numrit..." sx={{ mt: 0.75, ...squaredFieldSx }} />
                       )}
                     />
                   </Box>
@@ -650,7 +651,7 @@ export default function ComparePage() {
                 <Box sx={{ mt: 1.4, display: "grid", gridTemplateColumns: "1fr auto", gap: 1, alignItems: "end" }}>
                   <Box>
                     <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))", fontWeight: 600, mb: 0.4 }}>FOKUS (OPSIONAL)</Typography>
-                    <TextField fullWidth size="small" placeholder="e.g., data subject rights, penalties" value={focus} onChange={(e) => setFocus(e.target.value)} />
+                    <TextField fullWidth size="small" placeholder="e.g., data subject rights, penalties" value={focus} onChange={(e) => setFocus(e.target.value)} sx={squaredFieldSx} />
                   </Box>
                   <Button
                     variant="contained"
@@ -667,7 +668,7 @@ export default function ComparePage() {
                     sx={{
                       minWidth: 120,
                       height: 38,
-                      borderRadius: 1.2,
+                      borderRadius: 1,
                       textTransform: "none",
                       fontWeight: 600,
                       "&:hover": { color: "#000" },
@@ -690,7 +691,7 @@ export default function ComparePage() {
               <Box sx={{ mb: 2.2, display: "grid", gridTemplateColumns: "260px 1fr auto", gap: 1, alignItems: "end" }}>
                 <Box>
                   <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))", fontWeight: 600, mb: 0.4 }}>JURIDIKSIONI</Typography>
-                  <TextField select fullWidth size="small" value={singleSource} onChange={(e) => setSingleSource(e.target.value as SourceId)}>
+                  <TextField select fullWidth size="small" value={singleSource} onChange={(e) => setSingleSource(e.target.value as SourceId)} sx={squaredFieldSx}>
                     {SOURCE_OPTIONS.map((option) => <MenuItem key={option.id} value={option.id}>{option.label}</MenuItem>)}
                   </TextField>
                 </Box>
@@ -755,6 +756,7 @@ export default function ComparePage() {
                         fullWidth
                         size="small"
                         placeholder={activeTab === "amendment" ? "p.sh., 32016R0679 ose Ligji nr. 7961" : "p.sh., 31995L0046"}
+                        sx={squaredFieldSx}
                       />
                     )}
                   />
@@ -771,7 +773,7 @@ export default function ComparePage() {
                   sx={{
                     minWidth: 160,
                     height: 38,
-                    borderRadius: 1.2,
+                    borderRadius: 1,
                     textTransform: "none",
                     fontWeight: 600,
                     "&:hover": { color: "#000" },
