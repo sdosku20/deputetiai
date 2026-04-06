@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 // Optimized: Direct imports instead of barrel imports
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -15,12 +15,12 @@ interface SidebarProfileProps {
 
 export function SidebarProfile({ user }: SidebarProfileProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [profileImage, setProfileImage] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(`profilePicture_${user.email}`) || null;
-    }
-    return null;
-  });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setProfileImage(localStorage.getItem(`profilePicture_${user.email}`) || null);
+  }, [user.email]);
 
   // Get initials from user name
   const initials = user.name

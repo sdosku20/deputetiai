@@ -150,9 +150,9 @@ export default function LibraryPage() {
             throw lastSearchError;
           }
 
-          const mapped = (bestPayload.results || []).map((item) => ({
+          const mapped = (bestPayload.results || []).map((item, idx) => ({
             // Search results can include chunk-level `id`; use `document_id` for detail expansion.
-            id: String(item.document_id || item.id || `${source}-${Math.random()}`),
+            id: String(item.document_id || item.id || `${source}-search-${idx}`),
             source,
             title: String(item.title || "Pa titull"),
             subtitle: String(item.text_preview || item.subtitle || ""),
@@ -172,8 +172,8 @@ export default function LibraryPage() {
           throw new Error(`Documents request failed: ${response.status}`);
         }
         const payload = (await response.json()) as { documents: Array<Record<string, unknown>>; total: number };
-        const mapped = (payload.documents || []).map((item) => ({
-          id: String(item.id || `${source}-${Math.random()}`),
+        const mapped = (payload.documents || []).map((item, idx) => ({
+          id: String(item.id || `${source}-list-${idx}`),
           source,
           title: String(item.title || "Pa titull"),
           subtitle: String(item.subtitle || ""),

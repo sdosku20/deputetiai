@@ -6,6 +6,8 @@
  */
 
 export function ChartSkeleton() {
+  // Keep placeholder deterministic to avoid hydration mismatch.
+  const barHeights = [72, 54, 88, 63, 79, 47, 91, 66];
   return (
     <div
       className="bg-white rounded-lg p-6 shadow-sm border border-stroke animate-pulse"
@@ -25,7 +27,7 @@ export function ChartSkeleton() {
             key={i}
             className="flex-1 bg-gray-300 rounded-t"
             style={{
-              height: `${Math.random() * 60 + 40}%`,
+              height: `${barHeights[i]}%`,
             }}
           />
         ))}
