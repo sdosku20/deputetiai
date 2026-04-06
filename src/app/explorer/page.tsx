@@ -326,11 +326,11 @@ export default function ExplorerPage() {
           header={<PageHeader breadcrumbItems={[{ label: "Asistenti Ligjor" }]} user={userForHeader} onLogout={logout} />}
         >
           <Box sx={{ px: { xs: 1, sm: 2 }, pb: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, mb: 1 }}>
+            <Box sx={{ mb: 1 }}>
               <Button startIcon={<ArrowBackIcon />} size="small" onClick={() => router.push("/chat")}>
                 Kthehu te Chat
               </Button>
-              <Typography sx={{ fontSize: "1rem", fontWeight: 600 }}>Eksploro</Typography>
+              <Typography sx={{ fontSize: "1rem", fontWeight: 600, mt: 0.4 }}>Eksploro</Typography>
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 1.2, height: "calc(100dvh - 220px)" }}>
@@ -403,16 +403,8 @@ export default function ExplorerPage() {
                     <Typography sx={{ fontSize: "0.8rem", color: "hsl(var(--text-muted))", mt: 0.5 }}>{selectedDoc.id}</Typography>
                     <Box sx={{ mt: 1.2, display: "flex", gap: 0.6 }}>
                       <Chip label="Te gjitha kapitujt" color="primary" size="small" />
-                      <Chip label={`Recitale kapitulli (${selectedChunks.length})`} size="small" />
                     </Box>
-                    <TextField
-                      size="small"
-                      placeholder="Kerko nenet..."
-                      value={chunkQuery}
-                      onChange={(e) => setChunkQuery(e.target.value)}
-                      sx={{ mt: 1.1, mb: 1.1, width: "100%", maxWidth: 360 }}
-                    />
-                    <Divider sx={{ mb: 1.1 }} />
+                    <Divider sx={{ mt: 1.1, mb: 1.1 }} />
                     {detailLoading ? (
                       <Box sx={{ py: 5, display: "grid", placeItems: "center" }}>
                         <CircularProgress size={22} />

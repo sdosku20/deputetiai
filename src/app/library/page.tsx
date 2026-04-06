@@ -475,93 +475,93 @@ export default function LibraryPage() {
                       const isExpanded = expandedItemKey === itemKey;
                       const expandedText = expandedTextByItem[itemKey] || item.subtitle;
                       return (
-                      <Paper
-                        key={itemKey}
-                        onMouseEnter={() => {
-                          if (!expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
-                            loadExpandedText(item, itemKey, { prefetch: true });
-                          }
-                        }}
-                        onClick={() => {
-                          setExpandedItemKey((prev) => {
-                            const next = prev === itemKey ? null : itemKey;
-                            if (next === itemKey && !expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
-                              loadExpandedText(item, itemKey);
+                        <Paper
+                          key={itemKey}
+                          onMouseEnter={() => {
+                            if (!expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                              loadExpandedText(item, itemKey, { prefetch: true });
                             }
-                            return next;
-                          });
-                        }}
-                        sx={{
-                          p: 1.1,
-                          borderRadius: 1.8,
-                          cursor: "pointer",
-                          border: "1px solid hsl(var(--border-soft))",
-                          transition: "border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
-                          ...(isExpanded
-                            ? {
+                          }}
+                          onClick={() => {
+                            setExpandedItemKey((prev) => {
+                              const next = prev === itemKey ? null : itemKey;
+                              if (next === itemKey && !expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                                loadExpandedText(item, itemKey);
+                              }
+                              return next;
+                            });
+                          }}
+                          sx={{
+                            p: 1.1,
+                            borderRadius: 1.8,
+                            cursor: "pointer",
+                            border: "1px solid hsl(var(--border-soft))",
+                            transition: "border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
+                            ...(isExpanded
+                              ? {
                                 borderColor: "hsl(var(--primary))",
                                 boxShadow: "0 0 0 1px hsl(var(--primary) / 0.15)",
                               }
-                            : {
+                              : {
                                 "&:hover": {
                                   borderColor: "hsl(var(--text-muted))",
                                   backgroundColor: "hsl(var(--surface-muted))",
                                 },
                               }),
-                        }}
-                      >
-                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.7 }}>
-                              <Typography
-                                sx={{
-                                  fontSize: "0.9rem",
-                                  fontWeight: 600,
-                                  whiteSpace: isExpanded ? "normal" : "normal",
-                                  overflowWrap: "anywhere",
-                                  display: isExpanded ? "block" : "-webkit-box",
-                                  WebkitLineClamp: isExpanded ? "unset" : 3,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {item.title}
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.7 }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.9rem",
+                                    fontWeight: 600,
+                                    whiteSpace: isExpanded ? "normal" : "normal",
+                                    overflowWrap: "anywhere",
+                                    display: isExpanded ? "block" : "-webkit-box",
+                                    WebkitLineClamp: isExpanded ? "unset" : 3,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {item.title}
+                                </Typography>
+                                {loadingItemKeys[itemKey] ? <CircularProgress size={14} sx={{ color: "hsl(var(--text-muted))" }} /> : null}
+                              </Box>
+                              {item.subtitle ? (
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.8rem",
+                                    color: "hsl(var(--text-muted))",
+                                    mt: 0.3,
+                                    whiteSpace: isExpanded ? "pre-wrap" : "normal",
+                                    overflowWrap: "anywhere",
+                                    display: isExpanded ? "block" : "-webkit-box",
+                                    WebkitLineClamp: isExpanded ? "unset" : 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {isExpanded ? expandedText : item.subtitle}
+                                </Typography>
+                              ) : null}
+                              {isExpanded && loadingItemKeys[itemKey] ? (
+                                <Typography sx={{ mt: 0.35, fontSize: "0.76rem", color: "hsl(var(--text-muted))" }}>
+                                  Po ngarkohet teksti i plote...
+                                </Typography>
+                              ) : null}
+                              <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", mt: 0.45 }}>
+                                {item.docType}
+                                {item.date ? ` · ${item.date}` : ""}
+                                {item.source === "eu_law" ? " · EU" : " · AL"}
                               </Typography>
-                              {loadingItemKeys[itemKey] ? <CircularProgress size={14} sx={{ color: "hsl(var(--text-muted))" }} /> : null}
                             </Box>
-                            {item.subtitle ? (
-                              <Typography
-                                sx={{
-                                  fontSize: "0.8rem",
-                                  color: "hsl(var(--text-muted))",
-                                  mt: 0.3,
-                                  whiteSpace: isExpanded ? "pre-wrap" : "normal",
-                                  overflowWrap: "anywhere",
-                                  display: isExpanded ? "block" : "-webkit-box",
-                                  WebkitLineClamp: isExpanded ? "unset" : 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {isExpanded ? expandedText : item.subtitle}
-                              </Typography>
+                            {typeof item.score === "number" ? (
+                              <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))" }}>{item.score}%</Typography>
                             ) : null}
-                            {isExpanded && loadingItemKeys[itemKey] ? (
-                              <Typography sx={{ mt: 0.35, fontSize: "0.76rem", color: "hsl(var(--text-muted))" }}>
-                                Po ngarkohet teksti i plote...
-                              </Typography>
-                            ) : null}
-                            <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", mt: 0.45 }}>
-                              {item.docType}
-                              {item.date ? ` · ${item.date}` : ""}
-                              {item.source === "eu_law" ? " · EU" : " · AL"}
-                            </Typography>
                           </Box>
-                          {typeof item.score === "number" ? (
-                            <Typography sx={{ fontSize: "0.78rem", color: "hsl(var(--text-muted))" }}>{item.score}%</Typography>
-                          ) : null}
-                        </Box>
-                      </Paper>
+                        </Paper>
                       );
                     })}
                   </Box>
