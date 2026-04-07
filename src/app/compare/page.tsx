@@ -22,6 +22,7 @@ import { Sidebar } from "@/components/navigation/Sidebar";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
+import { translateToAlbanian } from "@/lib/translation/translator";
 
 type CompareTab = "cross" | "amendment" | "replacement";
 type SourceId = "eu_law" | "albania";
@@ -136,6 +137,36 @@ function scoreTone(v?: number): { bg: string; fg: string } {
   return { bg: "#ffe1e1", fg: "#c03636" };
 }
 
+function localizeHistoryTitle(title?: string): string | undefined {
+  if (!title) return title;
+  return title
+    .replace(/^Comparison:/i, "Krahasim:")
+    .replace(/\s+vs\s+/gi, " kundrejt ");
+}
+
+function mapKnownSectionTheme(theme?: string): string | undefined {
+  if (!theme) return theme;
+  const normalized = theme.trim().toLowerCase();
+  const known: Record<string, string> = {
+    "purpose and legal nature": "Qellimi dhe natyra ligjore",
+    "scope and covered subjects": "Fusha dhe subjektet e mbuluara",
+    "eligibility and beneficiary criteria": "Kriteret e kualifikimit dhe perfituesve",
+    "calculation of amounts": "Llogaritja e shumave",
+    "application, verification, and administration": "Aplikimi, verifikimi dhe administrimi",
+    "funding and financial source": "Financimi dhe burimi financiar",
+    "entry into force and temporal application": "Hyrja ne fuqi dhe zbatimi kohor",
+    "institutional implementation and enforcement": "Zbatimi institucional dhe mbikeqyrja",
+  };
+  return known[normalized] || theme;
+}
+
+function isLikelyEnglishText(text?: string): boolean {
+  if (!text || !text.trim()) return false;
+  return /\b(the|and|of|for|with|from|into|scope|purpose|legal|nature|covered|subjects|eligibility|beneficiary|criteria|calculation|amounts|application|verification|administration|funding|financial|source|entry|force|temporal|institutional|implementation|enforcement|differences|report|summary)\b/i.test(
+    text
+  );
+}
+
 export default function ComparePage() {
   const { user: authUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<CompareTab>("cross");
@@ -211,6 +242,59 @@ export default function ComparePage() {
     [ensureJwtToken]
   );
 
+  const maybeTranslateToAlbanian = useCallback(async (text?: string): Promise<string | undefined> => {
+    if (!text || !text.trim()) return text;
+    if (!isLikelyEnglishText(text)) return text;
+    try {
+      return await translateToAlbanian(text);
+    } catch {
+      return text;
+    }
+  }, []);
+
+  const localizeReportEnvelope = useCallback(
+    async (envelope: ReportEnvelope): Promise<ReportEnvelope> => {
+      if (!envelope.report) return envelope;
+      const report = envelope.report;
+      const sections = report.sections || [];
+
+      const localizedSections = await Promise.all(
+        sections.map(async (section) => ({
+          ...section,
+          theme: mapKnownSectionTheme(await maybeTranslateToAlbanian(section.theme)),
+          side_a: section.side_a
+            ? {
+                summary: await maybeTranslateToAlbanian(section.side_a.summary),
+                key_provisions: section.side_a.key_provisions
+                  ? await Promise.all(section.side_a.key_provisions.map((item) => maybeTranslateToAlbanian(item).then((v) => v || item)))
+                  : undefined,
+              }
+            : undefined,
+          side_b: section.side_b
+            ? {
+                summary: await maybeTranslateToAlbanian(section.side_b.summary),
+                key_provisions: section.side_b.key_provisions
+                  ? await Promise.all(section.side_b.key_provisions.map((item) => maybeTranslateToAlbanian(item).then((v) => v || item)))
+                  : undefined,
+              }
+            : undefined,
+          differences: await maybeTranslateToAlbanian(section.differences),
+        }))
+      );
+
+      return {
+        ...envelope,
+        report: {
+          ...report,
+          title: localizeHistoryTitle(await maybeTranslateToAlbanian(report.title)),
+          summary: await maybeTranslateToAlbanian(report.summary),
+          sections: localizedSections,
+        },
+      };
+    },
+    [maybeTranslateToAlbanian]
+  );
+
   const loadHistory = useCallback(async (): Promise<HistoryItem[]> => {
     setHistoryLoading(true);
     try {
@@ -219,7 +303,10 @@ export default function ComparePage() {
       if (!response.ok) {
         throw new Error((payload as { detail?: string }).detail || "Failed to load history.");
       }
-      const nextHistory = Array.isArray(payload) ? payload : [];
+      const nextHistory = (Array.isArray(payload) ? payload : []).map((item) => ({
+        ...item,
+        title: localizeHistoryTitle(item.title),
+      }));
       setHistory(nextHistory);
       return nextHistory;
     } catch {
@@ -247,7 +334,8 @@ export default function ComparePage() {
         const response = await authedFetch(`/api/compare?action=report&report_id=${id}`);
         const payload = (await response.json()) as ReportEnvelope & { detail?: string };
         if (!response.ok) throw new Error(payload.detail || "Ngarkimi i raportit deshtoi.");
-        setHistoryReports((prev) => ({ ...prev, [id]: payload }));
+        const localized = await localizeReportEnvelope(payload);
+        setHistoryReports((prev) => ({ ...prev, [id]: localized }));
       } catch {
         setHistoryReports((prev) => ({
           ...prev,
@@ -255,7 +343,7 @@ export default function ComparePage() {
         }));
       }
     },
-    [authedFetch, historyReports]
+    [authedFetch, historyReports, localizeReportEnvelope]
   );
 
   const runComparison = useCallback(
@@ -849,7 +937,7 @@ export default function ComparePage() {
                             >
                               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.4 }}>
                                 <Box>
-                                  <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, mb: 0.35 }}>{item.title || `Comparison #${item.id}`}</Typography>
+                                  <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, mb: 0.35 }}>{item.title || `Krahasim #${item.id}`}</Typography>
                                   <Box sx={{ display: "flex", gap: 1.1, alignItems: "center", color: "hsl(var(--text-muted))", fontSize: "0.85rem" }}>
                                     <Typography sx={{ fontSize: "0.85rem" }}>{sourceLabel(item.source_a)} vs {sourceLabel(item.source_b)}</Typography>
                                     <Chip label={scorePercent(item.overall_alignment)} size="small" sx={{ bgcolor: historyTone.bg, color: historyTone.fg, fontWeight: 600, height: 22 }} />
