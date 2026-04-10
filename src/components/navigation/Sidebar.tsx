@@ -6,7 +6,6 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
-import CompareArrowsOutlinedIcon from "@mui/icons-material/CompareArrowsOutlined";
 import { usePathname, useRouter } from "next/navigation";
 import type { NavigationItem } from "@/types/dashboard";
 import { SidebarLogo } from "./SidebarLogo";
@@ -43,7 +42,6 @@ export function Sidebar({
   const footerLinks = [
     { id: "library", label: "Biblioteka", path: "/library", icon: <SearchOutlinedIcon sx={{ fontSize: 18 }} /> },
     { id: "explorer", label: "Eksploro", path: "/explorer", icon: <ExploreOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { id: "compare", label: "Krahaso", path: "/compare", icon: <CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} /> },
   ];
 
   return (

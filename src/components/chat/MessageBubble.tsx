@@ -205,99 +205,90 @@ export function MessageBubble({
         const articleHint = (selectedSource.article || rest.join(" ")).trim().toLowerCase();
         const docIdHint = treatyDocId || cleanedDocId;
 
-        const inferredSourceType =
-          selectedSource.sourceType === "eurlex" || /^\d{4}[A-Z]/i.test(docIdHint || "") || /^(teu|tfeu)$/i.test(docIdHint || "")
-            ? "eu_law"
-            : selectedLawSource;
-        const sourceCandidates = Array.from(
-          new Set<string>([
-            inferredSourceType,
-            inferredSourceType === "eu_law" ? "albanian" : "eu_law",
-          ])
-        );
-
         const hintTokens = articleHint
           .split(/\s+/)
           .map((token) => token.trim())
           .filter((token) => token.length > 1);
 
-        for (const sourceType of sourceCandidates) {
-          let resolvedDocId = selectedSource.documentId || treatyDocId || cleanedDocId || "";
+        const sourceFromMetadata =
+          selectedSource.dataSource === "eu_law" || selectedSource.dataSource === "albanian"
+            ? selectedSource.dataSource
+            : null;
+        const sourceType: "eu_law" | "albanian" = sourceFromMetadata || selectedLawSource;
+        let resolvedDocId = selectedSource.documentId || treatyDocId || cleanedDocId || "";
 
-          // Always try search first to resolve canonical document IDs.
-          const searchResult = await fetchWithAuthRetry(
-            `/api/library?source=${encodeURIComponent(sourceType)}&q=${encodeURIComponent(label)}&limit=5`,
-            jwtToken
-          );
-          jwtToken = searchResult.token;
-          const searchRes = searchResult.response;
-          if (searchRes.ok) {
-            const searchJson = (await searchRes.json()) as { results?: Array<Record<string, unknown>> };
-            const results = searchJson.results || [];
-            const matched = results.find((item) => {
-              const candidateId = String(item.document_id || item.id || "");
-              return docIdHint ? candidateId.toLowerCase().includes(docIdHint.toLowerCase()) : Boolean(candidateId);
-            });
-            const firstResult = matched || results[0];
-            const candidate = firstResult?.document_id || firstResult?.id;
-            if (typeof candidate === "string" && candidate.trim()) {
-              resolvedDocId = candidate.trim();
-            }
+        // Resolve to canonical document ID inside the selected source only.
+        const searchResult = await fetchWithAuthRetry(
+          `/api/library?source=${encodeURIComponent(sourceType)}&q=${encodeURIComponent(label)}&limit=5`,
+          jwtToken
+        );
+        jwtToken = searchResult.token;
+        const searchRes = searchResult.response;
+        if (searchRes.ok) {
+          const searchJson = (await searchRes.json()) as { results?: Array<Record<string, unknown>> };
+          const results = searchJson.results || [];
+          const matched = results.find((item) => {
+            const candidateId = String(item.document_id || item.id || "");
+            return docIdHint ? candidateId.toLowerCase().includes(docIdHint.toLowerCase()) : Boolean(candidateId);
+          });
+          const firstResult = matched || results[0];
+          const candidate = firstResult?.document_id || firstResult?.id;
+          if (typeof candidate === "string" && candidate.trim()) {
+            resolvedDocId = candidate.trim();
           }
+        }
 
-          if (!resolvedDocId) continue;
-          setResolvedExplorerSource(sourceType as "eu_law" | "albanian");
-          setResolvedExplorerDocId(resolvedDocId);
+        if (!resolvedDocId) return;
+        setResolvedExplorerSource(sourceType);
+        setResolvedExplorerDocId(resolvedDocId);
 
-          const detailResult = await fetchWithAuthRetry(
-            `/api/library?source=${encodeURIComponent(sourceType)}&doc_id=${encodeURIComponent(resolvedDocId)}`,
-            jwtToken
-          );
-          jwtToken = detailResult.token;
-          const detailRes = detailResult.response;
+        const detailResult = await fetchWithAuthRetry(
+          `/api/library?source=${encodeURIComponent(sourceType)}&doc_id=${encodeURIComponent(resolvedDocId)}`,
+          jwtToken
+        );
+        jwtToken = detailResult.token;
+        const detailRes = detailResult.response;
 
-          const chunksResult = await fetchWithAuthRetry(
-            `/api/library?source=${encodeURIComponent(sourceType)}&doc_id=${encodeURIComponent(resolvedDocId)}&mode=chunks`,
-            jwtToken
-          );
-          jwtToken = chunksResult.token;
-          const chunksRes = chunksResult.response;
+        const chunksResult = await fetchWithAuthRetry(
+          `/api/library?source=${encodeURIComponent(sourceType)}&doc_id=${encodeURIComponent(resolvedDocId)}&mode=chunks`,
+          jwtToken
+        );
+        jwtToken = chunksResult.token;
+        const chunksRes = chunksResult.response;
 
-          if (!detailRes.ok && !chunksRes.ok) continue;
+        if (!detailRes.ok && !chunksRes.ok) return;
 
-          const detailJson = detailRes.ok ? ((await detailRes.json()) as Record<string, unknown>) : null;
-          const chunksJson = chunksRes.ok ? ((await chunksRes.json()) as { chunks?: Array<Record<string, unknown>> }) : { chunks: [] };
-          const chunks = chunksJson.chunks || [];
+        const detailJson = detailRes.ok ? ((await detailRes.json()) as Record<string, unknown>) : null;
+        const chunksJson = chunksRes.ok ? ((await chunksRes.json()) as { chunks?: Array<Record<string, unknown>> }) : { chunks: [] };
+        const chunks = chunksJson.chunks || [];
 
-          const matchedChunk =
-            chunks.find((chunk) => {
-              const article = String(chunk.article_label || chunk.group_label || "").toLowerCase();
-              const heading = String(chunk.article_title || chunk.group_title || chunk.article_heading || "").toLowerCase();
-              if (!articleHint) return false;
-              if (article.includes(articleHint) || heading.includes(articleHint)) return true;
-              return hintTokens.some((token) => article.includes(token) || heading.includes(token));
-            }) || chunks[0];
+        const matchedChunk =
+          chunks.find((chunk) => {
+            const article = String(chunk.article_label || chunk.group_label || "").toLowerCase();
+            const heading = String(chunk.article_title || chunk.group_title || chunk.article_heading || "").toLowerCase();
+            if (!articleHint) return false;
+            if (article.includes(articleHint) || heading.includes(articleHint)) return true;
+            return hintTokens.some((token) => article.includes(token) || heading.includes(token));
+          }) || chunks[0];
 
-          const bestText =
-            (matchedChunk && (
-              String(
-                matchedChunk.text ||
-                matchedChunk.content ||
-                matchedChunk.chunk_text ||
-                matchedChunk.body ||
-                matchedChunk.full_text ||
-                matchedChunk.text_preview ||
-                ""
-              ).trim() || null
-            )) ||
-            (detailJson && String(detailJson.subtitle || detailJson.title || "").trim()) ||
-            selectedSource.textPreview ||
-            null;
+        const bestText =
+          (matchedChunk && (
+            String(
+              matchedChunk.text ||
+              matchedChunk.content ||
+              matchedChunk.chunk_text ||
+              matchedChunk.body ||
+              matchedChunk.full_text ||
+              matchedChunk.text_preview ||
+              ""
+            ).trim() || null
+          )) ||
+          (detailJson && String(detailJson.subtitle || detailJson.title || "").trim()) ||
+          selectedSource.textPreview ||
+          null;
 
-          if (bestText) {
-            setSourceDetailText(bestText);
-            break;
-          }
+        if (bestText) {
+          setSourceDetailText(bestText);
         }
       } catch {
         // Keep fallback preview text

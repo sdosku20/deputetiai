@@ -57,12 +57,14 @@ const MIN_SEARCH_LENGTH = 3;
 function ExplorerPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const requestedSourceFromUrl = searchParams.get("source");
   const requestedDocId = searchParams.get("doc_id");
   const { user: authUser, logout } = useAuth();
   const [source, setSource] = useState<SourceKey>("eu_law");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState<ExplorerDocument[]>([]);
+  const [documentsSource, setDocumentsSource] = useState<SourceKey | null>(null);
   const [total, setTotal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -152,6 +154,7 @@ function ExplorerPageContent() {
     const jwtToken = await ensureJwtToken();
     if (!jwtToken) {
       setDocuments([]);
+      setDocumentsSource(source);
       setTotal(0);
       return;
     }
@@ -174,6 +177,7 @@ function ExplorerPageContent() {
           if (fallbackList.ok) {
             const payload = (await fallbackList.json()) as { documents: ExplorerDocument[]; total: number };
             setDocuments(payload.documents || []);
+            setDocumentsSource(source);
             setTotal(payload.total || (payload.documents || []).length);
             if ((payload.documents || []).length > 0) {
               setSelectedId((prev) => prev || payload.documents[0].id);
@@ -182,7 +186,10 @@ function ExplorerPageContent() {
           }
         }
 
-        if (requestedDocId) {
+        const requestedDocMatchesCurrentSource = Boolean(
+          requestedDocId && (!requestedSourceFromUrl || requestedSourceFromUrl === source)
+        );
+        if (requestedDocMatchesCurrentSource && requestedDocId) {
           const docRes = await authedFetch(`/api/library?source=${encodeURIComponent(source)}&doc_id=${encodeURIComponent(requestedDocId)}`);
           if (docRes.ok) {
             const singleDoc = (await docRes.json()) as Record<string, unknown>;
@@ -196,6 +203,7 @@ function ExplorerPageContent() {
               chunk_count: Number(singleDoc.chunk_count || 0),
             };
             setDocuments([fallbackDoc]);
+            setDocumentsSource(source);
             setTotal(1);
             setSelectedId(fallbackDoc.id);
             return;
@@ -216,20 +224,23 @@ function ExplorerPageContent() {
           chunk_count: 0,
         }));
         setDocuments(mapped.filter((d) => d.id));
+        setDocumentsSource(source);
         setTotal(payload.total || mapped.length);
       } else {
         const payload = (await response.json()) as { documents: ExplorerDocument[]; total: number };
         setDocuments(payload.documents || []);
+        setDocumentsSource(source);
         setTotal(payload.total || (payload.documents || []).length);
       }
     } catch (error) {
       console.error("Explorer load failed:", error);
       setDocuments([]);
+      setDocumentsSource(source);
       setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, ensureJwtToken, query, requestedDocId, source]);
+  }, [authedFetch, ensureJwtToken, query, requestedDocId, requestedSourceFromUrl, source]);
 
   useEffect(() => {
     const t = setTimeout(fetchDocuments, 180);
@@ -248,7 +259,7 @@ function ExplorerPageContent() {
   const selectedDoc = useMemo(() => documents.find((doc) => doc.id === selectedId) || null, [documents, selectedId]);
 
   const fetchSelectedDocumentData = useCallback(async () => {
-    if (!selectedId) {
+    if (!selectedId || documentsSource !== source || !documents.some((doc) => doc.id === selectedId)) {
       setSelectedChunks([]);
       setSelectedDocDetail(null);
       return;
@@ -319,7 +330,7 @@ function ExplorerPageContent() {
     } finally {
       setDetailLoading(false);
     }
-  }, [authedFetch, ensureJwtToken, selectedId, source]);
+  }, [authedFetch, documents, documentsSource, ensureJwtToken, selectedId, source]);
 
   useEffect(() => {
     fetchSelectedDocumentData();
@@ -387,7 +398,13 @@ function ExplorerPageContent() {
                       label={opt.label}
                       size="small"
                       color={source === opt.id ? "primary" : "default"}
-                      onClick={() => setSource(opt.id)}
+                      onClick={() => {
+                        if (source === opt.id) return;
+                        setSource(opt.id);
+                        setSelectedId(null);
+                        setSelectedDocDetail(null);
+                        setSelectedChunks([]);
+                      }}
                     />
                   ))}
                 </Box>
