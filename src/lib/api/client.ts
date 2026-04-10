@@ -523,10 +523,25 @@ class ChatAPIClient {
       // backend OpenAI-compatible shape server-side.
       const selectedLaw = typeof window !== 'undefined' ? localStorage.getItem('selected_law') : null;
       const source: "eu_law" | "albanian" = selectedLaw === 'albanian' ? 'albanian' : 'eu_law';
-      const requestBody = {
+      const existingConversationId = (() => {
+        if (typeof window === "undefined") return null;
+        try {
+          const raw = localStorage.getItem(`chat_session_${sessionId}`);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw) as { conversation_id?: unknown };
+          return typeof parsed.conversation_id === "string" ? parsed.conversation_id : null;
+        } catch {
+          return null;
+        }
+      })();
+
+      const requestBody: { prompt: string; source: "eu_law" | "albanian"; conversation_id?: string } = {
         prompt: userMessage,
         source,
       };
+      if (existingConversationId) {
+        requestBody.conversation_id = existingConversationId;
+      }
 
       // Log what we're actually sending
       const requestBodyJson = JSON.stringify(requestBody);
@@ -539,8 +554,7 @@ class ChatAPIClient {
         source,
       });
 
-      // Ensure JWT is present when backend path requires bearer auth
-      // (currently needed for albanian conversation-mode proxying).
+      // Ensure JWT is present for chat proxying.
       const ensureJwtToken = async (forceRefresh = false): Promise<string | null> => {
         if (typeof window === 'undefined') return null;
         if (forceRefresh) {
@@ -573,17 +587,20 @@ class ChatAPIClient {
         }
       };
 
-      // Step 4: Send request via local proxy to keep API key server-side
-      let jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-      if (source === 'albanian') {
-        jwtToken = await ensureJwtToken();
+      let jwtToken = await ensureJwtToken();
+      if (!jwtToken) {
+        return {
+          success: false,
+          response: '',
+          error: 'Autentikimi deshtoi. Ju lutem hyni perseri.',
+        };
       }
 
-      const sendProxyRequest = (token: string | null) =>
+      const sendProxyRequest = (token: string) =>
         axios.post<ChatCompletionResponse>('/api/chat', requestBody, {
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Authorization: `Bearer ${token}`,
           },
           timeout: 120000,
         });
@@ -592,15 +609,20 @@ class ChatAPIClient {
       try {
         proxyResponse = await sendProxyRequest(jwtToken);
       } catch (error: any) {
-        // Albanian mode can fail with 401 if token is stale/missing; refresh once.
-        if (source === 'albanian' && error?.response?.status === 401) {
+        if (error?.response?.status === 401) {
           const refreshedToken = await ensureJwtToken(true);
+          if (!refreshedToken) throw error;
           proxyResponse = await sendProxyRequest(refreshedToken);
         } else {
           throw error;
         }
       }
       const response = proxyResponse.data;
+      const responseMetadata = response.metadata && typeof response.metadata === "object"
+        ? (response.metadata as Record<string, unknown>)
+        : null;
+      const responseConversationId =
+        typeof responseMetadata?.conversation_id === "string" ? responseMetadata.conversation_id : existingConversationId;
       const responseSourceSummary = Array.isArray(response.sources)
         ? response.sources.slice(0, 8).map((item) => {
           if (item && typeof item === "object") {
@@ -663,7 +685,7 @@ class ChatAPIClient {
         { role: "assistant", content: finalResponse, sources, reasoningSteps },
       ];
 
-      this.saveSessionMessages(sessionId, updatedMessages);
+      this.saveSessionMessages(sessionId, updatedMessages, responseConversationId || undefined);
 
       // Dispatch event to refresh sessions list in UI
       if (typeof window !== 'undefined') {

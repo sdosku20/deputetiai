@@ -56,6 +56,17 @@ export function useAgentSession(sessionId: string | null = null) {
 
       // Use provided sessionId or fall back to the hook's sessionId
       const activeSessionId = overrideSessionId || sessionId || "default";
+      const readExistingConversationId = (): string | undefined => {
+        if (typeof window === "undefined") return undefined;
+        try {
+          const raw = localStorage.getItem(`chat_session_${activeSessionId}`);
+          if (!raw) return undefined;
+          const parsed = JSON.parse(raw) as { conversation_id?: unknown };
+          return typeof parsed.conversation_id === "string" ? parsed.conversation_id : undefined;
+        } catch {
+          return undefined;
+        }
+      };
       
       devLog("[useAgentSession] Sending message:", {
         message: userMessage.substring(0, 50),
@@ -86,6 +97,7 @@ export function useAgentSession(sessionId: string | null = null) {
           try {
             const sessionData = {
               session_id: activeSessionId,
+              conversation_id: readExistingConversationId(),
               messages: updatedHistoryWithUser,
               last_updated: new Date().toISOString(),
             };
@@ -93,7 +105,8 @@ export function useAgentSession(sessionId: string | null = null) {
             
             // Update sessions list immediately
             const sessionsJson = localStorage.getItem('chat_sessions_list');
-            let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+            let sessions: Array<{ session_id: string; preview: string; last_updated: string; message_count: number }> =
+              sessionsJson ? JSON.parse(sessionsJson) : [];
             const firstUserMessage = updatedHistoryWithUser.find(m => m.role === 'user');
             const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
             
@@ -187,6 +200,7 @@ export function useAgentSession(sessionId: string | null = null) {
               const historyWithError = [...currentHistory, { role: "assistant" as const, content: errorContent }];
               const sessionData = {
                 session_id: activeSessionId,
+                conversation_id: readExistingConversationId(),
                 messages: historyWithError,
                 last_updated: new Date().toISOString(),
               };
@@ -194,7 +208,8 @@ export function useAgentSession(sessionId: string | null = null) {
               
               // Update sessions list
               const sessionsJson = localStorage.getItem('chat_sessions_list');
-              let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+              let sessions: Array<{ session_id: string; preview: string; last_updated: string; message_count: number }> =
+                sessionsJson ? JSON.parse(sessionsJson) : [];
               const firstUserMessage = historyWithError.find(m => m.role === 'user');
               const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
               
@@ -236,6 +251,7 @@ export function useAgentSession(sessionId: string | null = null) {
             const historyWithError = [...currentHistory, { role: "assistant" as const, content: errorMsg.content }];
             const sessionData = {
               session_id: activeSessionId,
+              conversation_id: readExistingConversationId(),
               messages: historyWithError,
               last_updated: new Date().toISOString(),
             };
@@ -243,7 +259,8 @@ export function useAgentSession(sessionId: string | null = null) {
             
             // Update sessions list
             const sessionsJson = localStorage.getItem('chat_sessions_list');
-            let sessions: any[] = sessionsJson ? JSON.parse(sessionsJson) : [];
+            let sessions: Array<{ session_id: string; preview: string; last_updated: string; message_count: number }> =
+              sessionsJson ? JSON.parse(sessionsJson) : [];
             const firstUserMessage = historyWithError.find(m => m.role === 'user');
             const preview = firstUserMessage?.content.substring(0, 50) || 'Bisede e re';
             

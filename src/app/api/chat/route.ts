@@ -1,31 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const REQUEST_TIMEOUT_MS = 45000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const MAX_PROMPT_LENGTH = 6000;
-const DEFAULT_MODEL = process.env.CHAT_MODEL || process.env.NEXT_PUBLIC_CHAT_MODEL || 'eu-law-rag';
-const ALBANIAN_MODEL = process.env.CHAT_MODEL_ALBANIAN || process.env.NEXT_PUBLIC_CHAT_MODEL_ALBANIAN || DEFAULT_MODEL;
-const ALLOWED_SOURCES = new Set(['eu_law', 'albanian']);
+const ALLOWED_SOURCES = new Set(["eu_law", "albanian"]);
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 type ChatProxyRequest = {
   prompt: string;
   source?: string;
-};
-
-
-type UpstreamChatResponse = {
-  id?: string;
-  created?: number;
-  choices?: unknown;
-  usage?: unknown;
-  sources?: unknown;
-  metadata?: unknown;
+  conversation_id?: string;
 };
 
 type UpstreamConversationCreateResponse = {
@@ -45,19 +34,19 @@ type UpstreamConversationMessageResponse = {
 };
 
 function getBackendBaseUrl(): string {
-  let baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://eu-law.deputeti.ai';
-  if (baseUrl.includes('#')) {
-    baseUrl = baseUrl.split('#')[0];
+  let baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "https://eu-law.deputeti.ai";
+  if (baseUrl.includes("#")) {
+    baseUrl = baseUrl.split("#")[0];
   }
-  return baseUrl.replace(/\/$/, '');
+  return baseUrl.replace(/\/$/, "");
 }
 
 function getClientIp(request: NextRequest): string {
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) return forwardedFor.split(',')[0].trim();
-  const realIp = request.headers.get('x-real-ip');
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  const realIp = request.headers.get("x-real-ip");
   if (realIp) return realIp;
-  return 'unknown';
+  return "unknown";
 }
 
 function isRateLimited(key: string): boolean {
@@ -79,8 +68,8 @@ function isRateLimited(key: string): boolean {
 }
 
 function sanitizePrompt(input: unknown): string | null {
-  if (typeof input !== 'string') return null;
-  const normalized = input.replace(/\u0000/g, '').trim();
+  if (typeof input !== "string") return null;
+  const normalized = input.replace(/\u0000/g, "").trim();
   if (!normalized) return null;
   if (normalized.length > MAX_PROMPT_LENGTH) {
     return normalized.slice(0, MAX_PROMPT_LENGTH);
@@ -88,16 +77,23 @@ function sanitizePrompt(input: unknown): string | null {
   return normalized;
 }
 
-function normalizeSource(input: unknown): 'eu_law' | 'albanian' {
-  if (typeof input !== 'string') return 'eu_law';
+function normalizeSource(input: unknown): "eu_law" | "albanian" {
+  if (typeof input !== "string") return "eu_law";
   const normalized = input.trim().toLowerCase();
-  return ALLOWED_SOURCES.has(normalized) ? (normalized as 'eu_law' | 'albanian') : 'eu_law';
+  return ALLOWED_SOURCES.has(normalized) ? (normalized as "eu_law" | "albanian") : "eu_law";
+}
+
+function sanitizeConversationId(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const normalized = input.trim();
+  if (!normalized) return null;
+  return normalized.slice(0, 120);
 }
 
 function getBearerAuthHeader(request: NextRequest): string | null {
-  const auth = request.headers.get('authorization');
+  const auth = request.headers.get("authorization");
   if (!auth) return null;
-  return auth.toLowerCase().startsWith('bearer ') ? auth : null;
+  return auth.toLowerCase().startsWith("bearer ") ? auth : null;
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -110,18 +106,12 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
   }
 }
 
-
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ detail: 'Service is not configured.' }, { status: 500 });
-    }
-
     const clientIp = getClientIp(request);
     if (isRateLimited(clientIp)) {
       return NextResponse.json(
-        { detail: 'Too many requests. Please wait a moment and try again.' },
+        { detail: "Too many requests. Please wait a moment and try again." },
         { status: 429 }
       );
     }
@@ -129,55 +119,41 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Partial<ChatProxyRequest>;
     const prompt = sanitizePrompt(body.prompt);
     const source = normalizeSource(body.source);
+    let conversationId = sanitizeConversationId(body.conversation_id);
     if (!prompt) {
-      return NextResponse.json(
-        { detail: 'Invalid request. Prompt is required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ detail: "Invalid request. Prompt is required." }, { status: 400 });
     }
 
-    const backendPayload = {
-      model: source === 'albanian' ? ALBANIAN_MODEL : DEFAULT_MODEL,
-      source,
-      data_source: source,
-      messages: [{ role: 'user', content: prompt }],
-    };
+    const authHeader = getBearerAuthHeader(request);
+    if (!authHeader) {
+      return NextResponse.json({ detail: "Authorization token is required." }, { status: 401 });
+    }
 
-    // For albanian mode, use conversation messages endpoint because it returns
-    // Albanian corpus sources (e.g. qbz) while /v1/chat/completions currently
-    // returns EU/EURLEX-only sources even with data_source=albanian.
-    if (source === 'albanian') {
-      const authHeader = getBearerAuthHeader(request);
-      if (!authHeader) {
-        return NextResponse.json(
-          { detail: 'Authorization token is required for Albanian mode.' },
-          { status: 401 }
-        );
-      }
-
-      const backendBase = getBackendBaseUrl();
-      const createConversationResponse = await fetchWithTimeout(
-        `${backendBase}/api/v1/conversations`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: authHeader,
-          },
-          body: JSON.stringify({
-            title: 'Bisede e re',
-            profile: 'general',
-          }),
-          cache: 'no-store',
-        }
-      );
+    const backendBase = getBackendBaseUrl();
+    const createConversation = async () => {
+      const createConversationResponse = await fetchWithTimeout(`${backendBase}/api/v1/conversations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify({
+          title: "Bisede e re",
+          profile: "general",
+          data_source: source,
+        }),
+        cache: "no-store",
+      });
 
       if (!createConversationResponse.ok) {
         const createText = await createConversationResponse.text();
-        return NextResponse.json(
-          { detail: createText || 'Failed to create conversation.' },
-          { status: createConversationResponse.status }
-        );
+        return {
+          id: null,
+          errorResponse: NextResponse.json(
+            { detail: createText || "Failed to create conversation." },
+            { status: createConversationResponse.status }
+          ),
+        };
       }
 
       let createdConversation: UpstreamConversationCreateResponse | null = null;
@@ -187,165 +163,114 @@ export async function POST(request: NextRequest) {
         createdConversation = null;
       }
 
-      const conversationId = createdConversation?.id;
-      if (!conversationId) {
-        return NextResponse.json(
-          { detail: 'Invalid conversation creation response.' },
-          { status: 502 }
-        );
+      if (!createdConversation?.id) {
+        return {
+          id: null,
+          errorResponse: NextResponse.json(
+            { detail: "Invalid conversation creation response." },
+            { status: 502 }
+          ),
+        };
       }
 
-      const sendMessageResponse = await fetchWithTimeout(
-        `${backendBase}/api/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: authHeader,
-          },
-          body: JSON.stringify({
-            content: prompt,
-            data_source: 'albanian',
-          }),
-          cache: 'no-store',
-        }
-      );
-
-      const sendMessageText = await sendMessageResponse.text();
-      if (!sendMessageResponse.ok) {
-        try {
-          const parsedError = JSON.parse(sendMessageText);
-          return NextResponse.json(parsedError, { status: sendMessageResponse.status });
-        } catch {
-          return NextResponse.json(
-            { detail: sendMessageText || 'Failed to get Albanian response.' },
-            { status: sendMessageResponse.status }
-          );
-        }
-      }
-
-      let parsedMessage: UpstreamConversationMessageResponse | null = null;
-      try {
-        parsedMessage = JSON.parse(sendMessageText) as UpstreamConversationMessageResponse;
-      } catch {
-        parsedMessage = null;
-      }
-
-      const assistant = parsedMessage?.assistant_message;
-      const assistantContent = assistant?.content;
-      if (!assistantContent) {
-        return NextResponse.json(
-          { detail: 'Invalid conversation message response format.' },
-          { status: 502 }
-        );
-      }
-
-      const syntheticId =
-        assistant?.id ||
-        (parsedMessage?.tracking_id ? `chatcmpl-${parsedMessage.tracking_id}` : `chatcmpl-${Date.now()}`);
-
-      const safeResponse = {
-        id: syntheticId,
-        created: Math.floor(Date.now() / 1000),
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: assistantContent,
-            },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: undefined,
-        sources: assistant?.sources ?? [],
-        metadata: {
-          ...(assistant?.metadata && typeof assistant.metadata === 'object' ? assistant.metadata : {}),
-          data_source: 'albanian',
-          via: 'conversations_api',
-          conversation_id: conversationId,
-        },
-      };
-
-      // Best-effort cleanup to avoid leaving temporary conversations.
-      fetch(`${backendBase}/api/v1/conversations/${encodeURIComponent(conversationId)}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: authHeader,
-        },
-        cache: 'no-store',
-      }).catch(() => {
-        // no-op
-      });
-
-      return NextResponse.json(safeResponse, { status: 200 });
-    }
-
-    const backendUrl = `${getBackendBaseUrl()}/v1/chat/completions`;
-    const requestInit: RequestInit = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-      },
-      body: JSON.stringify(backendPayload),
-      cache: 'no-store',
+      return { id: createdConversation.id, errorResponse: null as NextResponse | null };
     };
 
-    let upstreamResponse = await fetchWithTimeout(backendUrl, requestInit);
-    if ([502, 503, 504].includes(upstreamResponse.status)) {
-      upstreamResponse = await fetchWithTimeout(backendUrl, requestInit);
+    if (!conversationId) {
+      const created = await createConversation();
+      if (created.errorResponse) return created.errorResponse;
+      conversationId = created.id;
+    }
+    if (!conversationId) {
+      return NextResponse.json({ detail: "Conversation initialization failed." }, { status: 502 });
     }
 
-    const responseText = await upstreamResponse.text();
+    const sendMessage = async (cid: string) =>
+      fetchWithTimeout(`${backendBase}/api/v1/conversations/${encodeURIComponent(cid)}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify({
+          content: prompt,
+          data_source: source,
+        }),
+        cache: "no-store",
+      });
 
-    // Return a minimal safe shape to the browser to avoid exposing backend internals.
-    if (upstreamResponse.ok) {
+    let sendMessageResponse = await sendMessage(conversationId);
+    if (sendMessageResponse.status === 404) {
+      const recreated = await createConversation();
+      if (recreated.errorResponse) return recreated.errorResponse;
+      if (!recreated.id) {
+        return NextResponse.json({ detail: "Conversation recreation failed." }, { status: 502 });
+      }
+      conversationId = recreated.id;
+      sendMessageResponse = await sendMessage(conversationId);
+    }
+
+    const sendMessageText = await sendMessageResponse.text();
+    if (!sendMessageResponse.ok) {
       try {
-        const parsed = JSON.parse(responseText) as UpstreamChatResponse;
-        const safeResponse = {
-          id: parsed.id,
-          created: parsed.created,
-          choices: parsed.choices,
-          usage: parsed.usage,
-          sources: parsed.sources,
-          metadata: parsed.metadata,
-        };
-        return NextResponse.json(safeResponse, { status: upstreamResponse.status });
+        const parsedError = JSON.parse(sendMessageText);
+        return NextResponse.json(parsedError, { status: sendMessageResponse.status });
       } catch {
         return NextResponse.json(
-          { detail: 'Invalid upstream response format.' },
-          { status: 502 }
+          { detail: sendMessageText || "Failed to get chat response." },
+          { status: sendMessageResponse.status }
         );
       }
     }
 
-    // Preserve status, but avoid passing full upstream internals.
-    console.warn('[chat-route] Upstream chat failed', {
-      status: upstreamResponse.status,
-      source,
-      responsePreview: responseText.slice(0, 300),
-    });
-
+    let parsedMessage: UpstreamConversationMessageResponse | null = null;
     try {
-      const parsedError = JSON.parse(responseText);
-      return NextResponse.json(parsedError, { status: upstreamResponse.status });
+      parsedMessage = JSON.parse(sendMessageText) as UpstreamConversationMessageResponse;
     } catch {
-      return NextResponse.json(
-        { detail: responseText || 'Service is temporarily unavailable. Please try again in a moment.' },
-        { status: upstreamResponse.status }
-      );
+      parsedMessage = null;
     }
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      return NextResponse.json(
-        { detail: 'Service timeout. Please try again.' },
-        { status: 504 }
-      );
+
+    const assistant = parsedMessage?.assistant_message;
+    const assistantContent = assistant?.content;
+    if (!assistantContent) {
+      return NextResponse.json({ detail: "Invalid conversation message response format." }, { status: 502 });
+    }
+
+    const syntheticId =
+      assistant?.id ||
+      (parsedMessage?.tracking_id ? `chatcmpl-${parsedMessage.tracking_id}` : `chatcmpl-${Date.now()}`);
+
+    const safeResponse = {
+      id: syntheticId,
+      created: Math.floor(Date.now() / 1000),
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: assistantContent,
+          },
+          finish_reason: "stop",
+        },
+      ],
+      usage: undefined,
+      sources: assistant?.sources ?? [],
+      metadata: {
+        ...(assistant?.metadata && typeof assistant.metadata === "object" ? assistant.metadata : {}),
+        data_source: source,
+        via: "conversations_api",
+        conversation_id: conversationId,
+      },
+    };
+
+    return NextResponse.json(safeResponse, { status: 200 });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json({ detail: "Service timeout. Please try again." }, { status: 504 });
     }
 
     return NextResponse.json(
-      { detail: 'Service request failed. Please try again.' },
+      { detail: "Service request failed. Please try again." },
       { status: 500 }
     );
   }
