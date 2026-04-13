@@ -45,6 +45,61 @@ const SOURCE_FILTERS: SourceFilter[] = [
 const LIST_PAGE_SIZE = 200;
 const SEARCH_LIMIT_FALLBACKS = [50, 25, 10];
 const MIN_SEARCH_LENGTH = 3;
+const ELI_PREFIX = /^eli:/i;
+
+const normalizeTextValue = (value: unknown): string => {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  return "";
+};
+
+const extractDateFromEli = (eliValue: string): string => {
+  const segments = eliValue.trim().split(":");
+  for (let idx = 0; idx <= segments.length - 3; idx += 1) {
+    const year = segments[idx];
+    const month = segments[idx + 1];
+    const day = segments[idx + 2];
+    if (/^\d{4}$/.test(year) && /^\d{2}$/.test(month) && /^\d{2}$/.test(day)) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return "";
+};
+
+const isMetadataOnlyText = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return true;
+  if (ELI_PREFIX.test(normalized)) return true;
+
+  // Ignore short identifier-like tokens such as CELEX/internal ids.
+  return (
+    !/\s/.test(normalized) &&
+    /^[A-Za-z0-9._:/-]+$/.test(normalized) &&
+    /\d/.test(normalized) &&
+    normalized.length <= 32
+  );
+};
+
+const sanitizeLibrarySubtitle = (value: unknown): string => {
+  const normalized = normalizeTextValue(value);
+  if (isMetadataOnlyText(normalized)) return "";
+  return normalized;
+};
+
+const deriveLibraryDate = (item: Record<string, unknown>): string => {
+  const directDate =
+    normalizeTextValue(item.date) ||
+    normalizeTextValue(item.document_date) ||
+    normalizeTextValue(item.publication_date) ||
+    normalizeTextValue(item.approval_date);
+  if (directDate) return directDate;
+
+  const eliCandidate = [item.eli, item.subtitle, item.id, item.document_id]
+    .map((value) => normalizeTextValue(value))
+    .find((value) => ELI_PREFIX.test(value));
+
+  return eliCandidate ? extractDateFromEli(eliCandidate) : "";
+};
 
 export default function LibraryPage() {
   const { user: authUser, logout } = useAuth();
@@ -159,9 +214,9 @@ export default function LibraryPage() {
             documentId: documentId || undefined,
             source,
             title: String(item.title || "Pa titull"),
-            subtitle: String(item.text_preview || item.subtitle || ""),
+            subtitle: sanitizeLibrarySubtitle(item.text_preview || item.subtitle),
             docType: String(item.doc_type || "Dokument"),
-            date: "",
+            date: deriveLibraryDate(item),
             score: typeof item.score === "number" ? Math.round(item.score) : undefined,
             chunkId: typeof item.id === "string" ? item.id : undefined,
           }});
@@ -181,9 +236,9 @@ export default function LibraryPage() {
           documentId: typeof item.id === "string" ? item.id : undefined,
           source,
           title: String(item.title || "Pa titull"),
-          subtitle: String(item.subtitle || ""),
+          subtitle: sanitizeLibrarySubtitle(item.subtitle),
           docType: String(item.doc_type || "Dokument"),
-          date: String(item.date || ""),
+          date: deriveLibraryDate(item),
           score: undefined,
           chunkId: undefined,
         }));
@@ -308,7 +363,7 @@ export default function LibraryPage() {
           detailPayload?.full_text ||
           detailPayload?.content ||
           detailPayload?.text ||
-          detailPayload?.subtitle ||
+          sanitizeLibrarySubtitle(detailPayload?.subtitle) ||
           ""
         ).trim();
 
@@ -340,10 +395,10 @@ export default function LibraryPage() {
         }
       }
 
-      fullText = fullText || item.subtitle;
+      fullText = fullText || sanitizeLibrarySubtitle(item.subtitle);
       setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: fullText }));
     } catch {
-      setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: item.subtitle }));
+      setExpandedTextByItem((prev) => ({ ...prev, [itemKey]: sanitizeLibrarySubtitle(item.subtitle) }));
     } finally {
       setLoadingItemKeys((prev) => {
         const next = { ...prev };
@@ -358,7 +413,8 @@ export default function LibraryPage() {
     const timer = setTimeout(() => {
       results.slice(0, 2).forEach((item) => {
         const itemKey = `${item.source}-${item.documentId || item.id}`;
-        if (expandedTextByItem[itemKey] || loadingItemKeys[itemKey]) return;
+        const hasLoadedText = Object.prototype.hasOwnProperty.call(expandedTextByItem, itemKey);
+        if (hasLoadedText || loadingItemKeys[itemKey]) return;
         loadExpandedText(item, itemKey, { prefetch: true });
       });
     }, 350);
@@ -505,19 +561,24 @@ export default function LibraryPage() {
                     {results.map((item) => {
                       const itemKey = `${item.source}-${item.documentId || item.id}`;
                       const isExpanded = expandedItemKey === itemKey;
-                      const expandedText = expandedTextByItem[itemKey] || item.subtitle;
+                      const hasLoadedText = Object.prototype.hasOwnProperty.call(expandedTextByItem, itemKey);
+                      const collapsedSubtitle = item.subtitle.trim();
+                      const expandedText = (expandedTextByItem[itemKey] ?? item.subtitle).trim();
+                      const detailText = isExpanded
+                        ? (loadingItemKeys[itemKey] ? expandedText : expandedText || "Nuk ka informacion për këtë ligj.")
+                        : collapsedSubtitle;
                       return (
                         <Paper
                           key={itemKey}
                           onMouseEnter={() => {
-                            if (!expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                            if (!hasLoadedText && !loadingItemKeys[itemKey]) {
                               loadExpandedText(item, itemKey, { prefetch: true });
                             }
                           }}
                           onClick={() => {
                             setExpandedItemKey((prev) => {
                               const next = prev === itemKey ? null : itemKey;
-                              if (next === itemKey && !expandedTextByItem[itemKey] && !loadingItemKeys[itemKey]) {
+                              if (next === itemKey && !hasLoadedText && !loadingItemKeys[itemKey]) {
                                 loadExpandedText(item, itemKey);
                               }
                               return next;
@@ -561,7 +622,7 @@ export default function LibraryPage() {
                                 </Typography>
                                 {loadingItemKeys[itemKey] ? <CircularProgress size={14} sx={{ color: "hsl(var(--text-muted))" }} /> : null}
                               </Box>
-                              {item.subtitle ? (
+                              {detailText ? (
                                 <Typography
                                   sx={{
                                     fontSize: "0.8rem",
@@ -575,12 +636,12 @@ export default function LibraryPage() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {isExpanded ? expandedText : item.subtitle}
+                                  {detailText}
                                 </Typography>
                               ) : null}
                               {isExpanded && loadingItemKeys[itemKey] ? (
                                 <Typography sx={{ mt: 0.35, fontSize: "0.76rem", color: "hsl(var(--text-muted))" }}>
-                                  Po ngarkohet teksti i plote...
+                                  Po ngarkohet...
                                 </Typography>
                               ) : null}
                               <Typography sx={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", mt: 0.45 }}>
